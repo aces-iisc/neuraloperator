@@ -1,15 +1,15 @@
 """
-experimental/fft/tricks.py — 1-D FFT engines that LOST the bench.  Kept because
+1-D FFT engines that LOST the bench.  Kept because
 results/REPORT.md §1-2 quotes their numbers; nothing in the main tree imports them.
 
   fft_iter / fft_recur      complex64 radix-B FFT (iterative stage-loop / recursive twin).
                             Superseded by fft.rfft1d.fft_reim, which does the same work in
                             real/imag and skips the complex64 assembly tax (10-17% of device time).
   jax_rfft_int8             int8 "complex16" direct DFT — a dtype-comparison datapoint.
-  rfft_trickA / rfft_trickB real-input packing tricks (pair-two-signals / even-odd), both a
+  rfft_coupled / rfft_reduced real-input packing schemes (pair-two-signals / even-odd), both a
                             complex64 and a real/imag (_reim) flavour.  Measured 10-20% slower
                             than plain reim at N>=4096: the pack/unpack costs more than it saves.
-  full_via_trick*           full-spectrum reconstruction from the Hermitian half.
+  full_via_coupled/reduced  full-spectrum reconstruction from the Hermitian half.
 
 The winners live in fft/rfft1d.py.
 """
@@ -124,7 +124,7 @@ def rfft_base(xr, eng):
     return eng(xr.astype(C))[:N // 2 + 1]
 
 
-def rfft_trickA(xr, eng, ratio=0.5):
+def rfft_coupled(xr, eng, ratio=0.5):
     """Pair two real signals a,b -> z=a+ib, ONE length-N complex FFT, unpack the first
     m = round(N*ratio) Hermitian rows of each (m = n_modes for the FNO).  K must be even.
     NOTE: `eng` still computes the FULL N-bin FFT; `ratio` only trims the UNPACK.  Returns (m, K)."""
@@ -139,11 +139,11 @@ def rfft_trickA(xr, eng, ratio=0.5):
     return jnp.concatenate([A, Bb], axis=1)  # (_N, K)
 
 
-def rfft_trickA_reim(xr, ratio=0.5, dt=F):
+def rfft_coupled_reim(xr, ratio=0.5, dt=F):
     """Trick A, but real/imag ALL THE WAY — no complex64, no `c64` custom-call.  Pack a,b -> z=a+ib,
     ONE complex FFT via the real/imag core `_fft_c` (returns (Zr,Zi)), unpack in real/imag with
     slice-reversal (gather-free), return (yr, yi).  Tests whether dropping the c64 assembly (~12%
-    of trick A's device time) is a net win."""
+    of the coupled scheme's device time) is a net win."""
     N, K = xr.shape
     a, b = xr[:, :K // 2], xr[:, K // 2:]
     Zr, Zi = _fft_c(a.astype(dt), b.astype(dt), N)
@@ -158,7 +158,7 @@ def rfft_trickA_reim(xr, ratio=0.5, dt=F):
             jnp.concatenate([Ai, Bi], axis=1).astype(dt))
 
 
-def rfft_trickB_reim(xr, ratio=0.5, dt=F):
+def rfft_reduced_reim(xr, ratio=0.5, dt=F):
     """Trick B, real/imag ALL THE WAY — no complex64.  Even/odd -> z=even+i*odd, ONE HALF-length
     FFT via `_fft_c`, mirror via slice-reversal, twist X[k]=E[k]+W_N^k O[k] in real/imag, return
     (yr, yi).  No c64 assembly."""
@@ -178,7 +178,7 @@ def rfft_trickB_reim(xr, ratio=0.5, dt=F):
     return yr.astype(dt), yi.astype(dt)
 
 
-def rfft_trickB(xr, eng, ratio=0.5):
+def rfft_reduced(xr, eng, ratio=0.5):
     """Pack even/odd -> z=x_even+i*x_odd, ONE HALF-length FFT, last-layer twist
     X[k]=E[k]+W_N^k O[k].  Returns the first round(N*ratio) bins.  NOTE: `eng` still returns all
     N/2 bins; `ratio` only trims the twist/unpack output."""
@@ -201,7 +201,7 @@ def rfft_trickB(xr, eng, ratio=0.5):
     return out_main
 
 
-_VARIANTS = {"base": rfft_base, "trickA": rfft_trickA, "trickB": rfft_trickB}
+_VARIANTS = {"base": rfft_base, "coupled": rfft_coupled, "reduced": rfft_reduced}
 
 
 # ── full-spectrum (N, K) reconstruction from the half, vs recompute ──────────
@@ -216,16 +216,16 @@ def full_recompute(xr, eng):
     return eng(xr.astype(C))
 
 
-def full_via_trickA(xr, eng):
-    """FULL (N,K): Trick-A rfft (half work) + conjugate reconstruct."""
-    return _reconstruct_full(rfft_trickA(xr, eng), xr.shape[0])
+def full_via_coupled(xr, eng):
+    """FULL (N,K): coupled rfft (half work) + conjugate reconstruct."""
+    return _reconstruct_full(rfft_coupled(xr, eng), xr.shape[0])
 
 
-def full_via_trickB(xr, eng):
-    """FULL (N,K): Trick-B rfft (half work) + conjugate reconstruct."""
-    return _reconstruct_full(rfft_trickB(xr, eng), xr.shape[0])
+def full_via_reduced(xr, eng):
+    """FULL (N,K): reduced rfft (half work) + conjugate reconstruct."""
+    return _reconstruct_full(rfft_reduced(xr, eng), xr.shape[0])
 
 
 _FULL = {"recompute": full_recompute,
-         "viaTrickA": full_via_trickA,
-         "viaTrickB": full_via_trickB}
+         "viacoupled": full_via_coupled,
+         "viareduced": full_via_reduced}

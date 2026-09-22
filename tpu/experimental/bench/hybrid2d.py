@@ -1,5 +1,5 @@
 """
-bench_hybrid2d.py — run ON the v5e.  Tests the trickA+partial HYBRID (full FFT on axis-0 cols,
+bench_hybrid2d.py — run ON the v5e.  Tests the coupled+partial HYBRID (full FFT on axis-0 cols,
 partial low-mode DFT on axis-1 rows) vs the all-partial and full-reim 2D transforms, at real
 dataset (N, m) with realistic field batches K = batch x width.
 """
@@ -28,8 +28,8 @@ for label, N, m, K in CFG:
     eng = {"partial(both)":       lambda x, m=m, N=N: rfft2_partial(x, m / N, F),
            "hyb reim+partial":    lambda x, m=m: rfft2_hybrid(x, m, m, "reim", "partial", F),
            "hyb reim+staged-rows": lambda x, m=m: rfft2_hybrid(x, m, m, "reim", "staged", F),
-           "hybrid-trickA":       lambda x, m=m: rfft2_hybrid(x, m, m, "trickA", "partial", F),
-           "hybrid-trickB":       lambda x, m=m: rfft2_hybrid(x, m, m, "trickB", "partial", F),
+           "hybrid-coupled":       lambda x, m=m: rfft2_hybrid(x, m, m, "coupled", "partial", F),
+           "hybrid-reduced":       lambda x, m=m: rfft2_hybrid(x, m, m, "reduced", "partial", F),
            "reim(full both)":     lambda x: jax_rfft2(x, F)}
     print(f"\n### {label} 2D: N={N}^2, m={m}, K={K} fields (median us/run) ###", flush=True)
     for name, fn in eng.items():

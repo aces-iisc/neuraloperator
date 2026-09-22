@@ -4,7 +4,7 @@ at large N, ratio 0.5 (half spectrum).  Reports median blocked wall-clock us/run
 us/sample, plus a complex64-count column (must be 0 for every engine here — that's the point).
 
 Engines (all real/imag, no c64 custom-call):
-  1D : reim (direct half rfft) | trickA (reim) | trickB (reim) | pallas (full FFT resident in VMEM)
+  1D : reim (direct half rfft) | coupled (reim) | reduced (reim) | pallas (full FFT resident in VMEM)
   2D : reim (full real rfft)   | partial (rfft2_partial, low modes as GEMM) | pallas (full 2D in VMEM)
 
 Pallas computes the WHOLE transform in VMEM (NOT partial) -> it OOMs/hangs at large N, so it is
@@ -14,12 +14,12 @@ import time
 import jax, jax.numpy as jnp, numpy as np
 
 from ...fft.core import F  # noqa: F401  (import sets global highest matmul precision)
-from ...fft.rfft1d import rfft_half as jax_rfft, rfft_low_modes as rfft1d_partial
+from ...fft.rfft1d import rfft_half, rfft_low_modes as rfft1d_partial
 from ...fft.rfft2d import (rfft2_full as jax_rfft2, rfft2_full_staged_cols as jax_rfft2_fast,
                            rfft2_low_modes as rfft2_partial)
 from ..fft.pallas1d import pallas_half
 from ..fft.pallas2d import pallas_rfft2
-from ..fft.tricks import rfft_trickA_reim, rfft_trickB_reim
+from ..fft.tricks import rfft_coupled_reim, rfft_reduced_reim
 
 print("jax", jax.__version__, "|", jax.devices(), flush=True)
 K, KT, ITP = 256, 128, False
@@ -41,9 +41,9 @@ def c64_count(fn, x):
         return -1
 
 
-ENG1D = {"reim":   lambda x: jax_rfft(x, True, F),            # full half-spectrum (N/2 modes)
-         "trickA": lambda x: rfft_trickA_reim(x, 0.5, F),
-         "trickB": lambda x: rfft_trickB_reim(x, 0.5, F)}
+ENG1D = {"reim":   lambda x: rfft_half(x, F),            # full half-spectrum (N/2 modes)
+         "coupled": lambda x: rfft_coupled_reim(x, 0.5, F),
+         "reduced": lambda x: rfft_reduced_reim(x, 0.5, F)}
 ENG2D = {"reim":      lambda x: jax_rfft2(x, F),              # axis-1 = direct O(N2^2) DFT
          "reim-fast": lambda x: jax_rfft2_fast(x, F),         # axis-1 = STAGED FFT O(N2 log N2)
          "partial":   lambda x: rfft2_partial(x, 0.5, F),

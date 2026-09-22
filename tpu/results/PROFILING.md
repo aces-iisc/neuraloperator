@@ -20,24 +20,24 @@
 | N | engine | who | D | func | method | trick | device µs | HBM MB | AI | MXU% | VPU% | memops% | custom% |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 256 | ★ us_1D_rfft_direct-int8 | us | 1D | rfft | direct-int8 | — | 3.4 | 0.79 | 8 | 32 | 68 | 0 | 0 |
-| 256 | us_1D_rfft_pallas_trickB | us | 1D | rfft | pallas | trickB | 4.0 | — | 0 | 0 | 0 | 0 | 100 |
-| 256 | us_1D_rfft_fft-recur_trickB | us | 1D | rfft | fft-recur | trickB | 4.9 | 0.66 | 5 | 38 | 8 | 38 | 17 |
-| 256 | us_1D_rfft_fft-iter_trickB | us | 1D | rfft | fft-iter | trickB | 4.9 | 0.66 | 5 | 38 | 8 | 38 | 17 |
+| 256 | us_1D_rfft_pallas_reduced | us | 1D | rfft | pallas | reduced | 4.0 | — | 0 | 0 | 0 | 0 | 100 |
+| 256 | us_1D_rfft_fft-recur_reduced | us | 1D | rfft | fft-recur | reduced | 4.9 | 0.66 | 5 | 38 | 8 | 38 | 17 |
+| 256 | us_1D_rfft_fft-iter_reduced | us | 1D | rfft | fft-iter | reduced | 4.9 | 0.66 | 5 | 38 | 8 | 38 | 17 |
 | 256 | us_1D_rfft_pallas | us | 1D | rfft | pallas | — | 5.4 | — | 0 | 0 | 0 | 0 | 100 |
 | 256 | us_1D_fft_pallas | us | 1D | fft | pallas | — | 5.6 | — | 0 | 0 | 0 | 0 | 100 |
 | 256 | us_1D_rfft_pallas-bf16 | us | 1D | rfft | pallas-bf16 | — | 6.0 | — | 0 | 0 | 0 | 0 | 100 |
 | 256 | us_1D_rfft_reim-bf16 | us | 1D | rfft | reim-bf16 | — | 6.0 | 0.26 | 9 | 44 | 19 | 37 | 0 |
-| 256 | us_1D_rfft_fft-recur_trickA | us | 1D | rfft | fft-recur | trickA | 6.2 | 0.26 | 4 | 48 | 17 | 22 | 13 |
-| 256 | us_1D_rfft_fft-iter_trickA | us | 1D | rfft | fft-iter | trickA | 6.2 | 0.26 | 4 | 47 | 18 | 22 | 13 |
+| 256 | us_1D_rfft_fft-recur_coupled | us | 1D | rfft | fft-recur | coupled | 6.2 | 0.26 | 4 | 48 | 17 | 22 | 13 |
+| 256 | us_1D_rfft_fft-iter_coupled | us | 1D | rfft | fft-iter | coupled | 6.2 | 0.26 | 4 | 47 | 18 | 22 | 13 |
 | 256 | us_1D_rfft_reim | us | 1D | rfft | reim | — | 6.4 | 0.52 | 6 | 41 | 17 | 41 | 0 |
-| 256 | jnp_1D_rfft_jnp-fft_trickB | jnp | 1D | rfft | jnp-fft | trickB | 6.6 | 0.92 | 24 | 39 | 14 | 35 | 12 |
+| 256 | jnp_1D_rfft_jnp-fft_reduced | jnp | 1D | rfft | jnp-fft | reduced | 6.6 | 0.92 | 24 | 39 | 14 | 35 | 12 |
 | 256 | us_1D_rfft_reim-int8 | us | 1D | rfft | reim-int8 | — | 6.8 | 0.13 | 6 | 27 | 41 | 31 | 0 |
 | 256 | us_1D_fft_fft-recur | us | 1D | fft | fft-recur | — | 7.4 | 0.26 | 7 | 46 | 2 | 36 | 16 |
 | 256 | us_1D_fft_fft-iter | us | 1D | fft | fft-iter | — | 7.5 | 0.26 | 7 | 46 | 2 | 36 | 15 |
 | 256 | us_1D_rfft_conv-hlo | us | 1D | rfft | conv-hlo | — | 7.8 | 0.92 | 5 | 53 | 6 | 24 | 11 |
 | 256 | jnp_1D_rfft_jnp-fft | jnp | 1D | rfft | jnp-fft | — | 8.9 | 0.26 | 154 | 67 | 24 | 0 | 9 |
 | 256 | jnp_1D_fft_jnp-fft | jnp | 1D | fft | jnp-fft | — | 9.0 | 0.26 | 154 | 65 | 22 | 0 | 13 |
-| 256 | jnp_1D_rfft_jnp-fft_trickA | jnp | 1D | rfft | jnp-fft | trickA | 10.0 | 0.79 | 50 | 82 | 1 | 9 | 8 |
+| 256 | jnp_1D_rfft_jnp-fft_coupled | jnp | 1D | rfft | jnp-fft | coupled | 10.0 | 0.79 | 50 | 82 | 1 | 9 | 8 |
 | 1024 | ★ us_1D_rfft_pallas | us | 1D | rfft | pallas | — | 7.8 | — | 0 | 0 | 0 | 0 | 100 |
 | 1024 | us_1D_rfft_reim-bf16 | us | 1D | rfft | reim-bf16 | — | 8.1 | 1.05 | 9 | 47 | 6 | 47 | 0 |
 | 1024 | us_1D_rfft_pallas-bf16 | us | 1D | rfft | pallas-bf16 | — | 8.1 | — | 0 | 0 | 0 | 0 | 100 |
@@ -47,16 +47,16 @@
 | 1024 | us_1D_rfft_conv-hlo | us | 1D | rfft | conv-hlo | — | 12.4 | 2.10 | 7 | 60 | 6 | 17 | 15 |
 | 1024 | us_1D_fft_fft-recur | us | 1D | fft | fft-recur | — | 15.0 | 2.10 | 7 | 47 | 1 | 29 | 22 |
 | 1024 | us_1D_fft_fft-iter | us | 1D | fft | fft-iter | — | 15.0 | 2.10 | 7 | 47 | 1 | 29 | 22 |
-| 1024 | us_1D_rfft_fft-recur_trickA | us | 1D | rfft | fft-recur | trickA | 15.1 | 2.10 | 3 | 36 | 18 | 34 | 12 |
-| 1024 | us_1D_rfft_fft-iter_trickA | us | 1D | rfft | fft-iter | trickA | 15.1 | 2.10 | 3 | 35 | 18 | 34 | 12 |
-| 1024 | us_1D_rfft_fft-recur_trickB | us | 1D | rfft | fft-recur | trickB | 16.8 | 2.62 | 3 | 25 | 7 | 53 | 11 |
-| 1024 | us_1D_rfft_fft-iter_trickB | us | 1D | rfft | fft-iter | trickB | 16.8 | 2.62 | 3 | 25 | 7 | 52 | 11 |
-| 1024 | jnp_1D_rfft_jnp-fft_trickA | jnp | 1D | rfft | jnp-fft | trickA | 17.3 | 1.57 | 22 | 56 | 11 | 22 | 11 |
+| 1024 | us_1D_rfft_fft-recur_coupled | us | 1D | rfft | fft-recur | coupled | 15.1 | 2.10 | 3 | 36 | 18 | 34 | 12 |
+| 1024 | us_1D_rfft_fft-iter_coupled | us | 1D | rfft | fft-iter | coupled | 15.1 | 2.10 | 3 | 35 | 18 | 34 | 12 |
+| 1024 | us_1D_rfft_fft-recur_reduced | us | 1D | rfft | fft-recur | reduced | 16.8 | 2.62 | 3 | 25 | 7 | 53 | 11 |
+| 1024 | us_1D_rfft_fft-iter_reduced | us | 1D | rfft | fft-iter | reduced | 16.8 | 2.62 | 3 | 25 | 7 | 52 | 11 |
+| 1024 | jnp_1D_rfft_jnp-fft_coupled | jnp | 1D | rfft | jnp-fft | coupled | 17.3 | 1.57 | 22 | 56 | 11 | 22 | 11 |
 | 1024 | us_1D_rfft_direct-int8 | us | 1D | rfft | direct-int8 | — | 23.0 | 3.15 | 27 | 15 | 84 | 1 | 0 |
 | 1024 | jnp_1D_rfft_jnp-fft | jnp | 1D | rfft | jnp-fft | — | 23.0 | 1.05 | 47 | 74 | 1 | 17 | 8 |
-| 1024 | jnp_1D_rfft_jnp-fft_trickB | jnp | 1D | rfft | jnp-fft | trickB | 23.4 | 1.57 | 21 | 54 | 6 | 29 | 8 |
+| 1024 | jnp_1D_rfft_jnp-fft_reduced | jnp | 1D | rfft | jnp-fft | reduced | 23.4 | 1.57 | 21 | 54 | 6 | 29 | 8 |
 | 1024 | jnp_1D_fft_jnp-fft | jnp | 1D | fft | jnp-fft | — | 24.3 | 1.05 | 51 | 70 | 1 | 16 | 13 |
-| 1024 | us_1D_rfft_pallas_trickB | us | 1D | rfft | pallas | trickB | 35.9 | — | 0 | 0 | 0 | 0 | 100 |
+| 1024 | us_1D_rfft_pallas_reduced | us | 1D | rfft | pallas | reduced | 35.9 | — | 0 | 0 | 0 | 0 | 100 |
 | 64x64 | ★ us_2D_rfft_partial | us | 2D | rfft | partial | — | 16.7 | 6.29 | 8 | 53 | 0 | 47 | 0 |
 | 64x64 | us_2D_rfft_reim | us | 2D | rfft | reim | — | 21.0 | 8.39 | 7 | 52 | 2 | 45 | 0 |
 | 64x64 | jnp_2D_rfft_jnp-fft | jnp | 2D | rfft | jnp-fft | — | 51.1 | 4.19 | 54 | 83 | 4 | 0 | 13 |
@@ -66,14 +66,14 @@
 | 4096 | us_1D_rfft_reim-bf16 | us | 1D | rfft | reim-bf16 | — | 26.2 | 4.19 | 11 | 56 | 3 | 42 | 0 |
 | 4096 | us_1D_rfft_reim | us | 1D | rfft | reim | — | 31.3 | 8.39 | 7 | 47 | 3 | 50 | 0 |
 | 4096 | us_1D_rfft_conv-hlo | us | 1D | rfft | conv-hlo | — | 44.3 | 8.39 | 8 | 59 | 7 | 16 | 15 |
-| 4096 | us_1D_rfft_fft-recur_trickA | us | 1D | rfft | fft-recur | trickA | 53.9 | 6.29 | 4 | 41 | 16 | 31 | 12 |
-| 4096 | us_1D_rfft_fft-iter_trickA | us | 1D | rfft | fft-iter | trickA | 54.0 | 6.29 | 4 | 41 | 16 | 31 | 12 |
+| 4096 | us_1D_rfft_fft-recur_coupled | us | 1D | rfft | fft-recur | coupled | 53.9 | 6.29 | 4 | 41 | 16 | 31 | 12 |
+| 4096 | us_1D_rfft_fft-iter_coupled | us | 1D | rfft | fft-iter | coupled | 54.0 | 6.29 | 4 | 41 | 16 | 31 | 12 |
 | 4096 | us_1D_fft_fft-recur | us | 1D | fft | fft-recur | — | 57.2 | 8.39 | 8 | 43 | 1 | 34 | 22 |
 | 4096 | us_1D_fft_fft-iter | us | 1D | fft | fft-iter | — | 57.3 | 8.39 | 8 | 43 | 1 | 34 | 23 |
-| 4096 | us_1D_rfft_fft-recur_trickB | us | 1D | rfft | fft-recur | trickB | 60.3 | 14.68 | 3 | 22 | 7 | 58 | 11 |
-| 4096 | us_1D_rfft_fft-iter_trickB | us | 1D | rfft | fft-iter | trickB | 60.3 | 14.68 | 3 | 22 | 7 | 58 | 11 |
-| 4096 | jnp_1D_rfft_jnp-fft_trickA | jnp | 1D | rfft | jnp-fft | trickA | 60.4 | 4.19 | 29 | 57 | 16 | 16 | 11 |
-| 4096 | jnp_1D_rfft_jnp-fft_trickB | jnp | 1D | rfft | jnp-fft | trickB | 71.1 | 6.29 | 24 | 49 | 7 | 35 | 9 |
+| 4096 | us_1D_rfft_fft-recur_reduced | us | 1D | rfft | fft-recur | reduced | 60.3 | 14.68 | 3 | 22 | 7 | 58 | 11 |
+| 4096 | us_1D_rfft_fft-iter_reduced | us | 1D | rfft | fft-iter | reduced | 60.3 | 14.68 | 3 | 22 | 7 | 58 | 11 |
+| 4096 | jnp_1D_rfft_jnp-fft_coupled | jnp | 1D | rfft | jnp-fft | coupled | 60.4 | 4.19 | 29 | 57 | 16 | 16 | 11 |
+| 4096 | jnp_1D_rfft_jnp-fft_reduced | jnp | 1D | rfft | jnp-fft | reduced | 71.1 | 6.29 | 24 | 49 | 7 | 35 | 9 |
 | 4096 | jnp_1D_rfft_jnp-fft | jnp | 1D | rfft | jnp-fft | — | 83.7 | 4.19 | 55 | 73 | 1 | 18 | 8 |
 | 4096 | jnp_1D_fft_jnp-fft | jnp | 1D | fft | jnp-fft | — | 94.4 | 4.19 | 60 | 71 | 0 | 15 | 14 |
 | 4096 | us_1D_rfft_direct-int8 | us | 1D | rfft | direct-int8 | — | 275.5 | 12.58 | 90 | 9 | 91 | 0 | 0 |
@@ -81,14 +81,14 @@
 | 8192 | us_1D_rfft_reim-bf16 | us | 1D | rfft | reim-bf16 | — | 69.0 | 8.39 | 14 | 39 | 2 | 60 | 0 |
 | 8192 | us_1D_rfft_reim | us | 1D | rfft | reim | — | 74.6 | 16.78 | 9 | 39 | 3 | 58 | 0 |
 | 8192 | us_1D_rfft_conv-hlo | us | 1D | rfft | conv-hlo | — | 99.5 | 16.78 | 9 | 48 | 6 | 34 | 13 |
-| 8192 | us_1D_rfft_fft-recur_trickA | us | 1D | rfft | fft-recur | trickA | 107.8 | 12.58 | 5 | 40 | 17 | 31 | 12 |
-| 8192 | us_1D_rfft_fft-iter_trickA | us | 1D | rfft | fft-iter | trickA | 107.9 | 12.58 | 5 | 40 | 17 | 31 | 12 |
-| 8192 | us_1D_rfft_fft-recur_trickB | us | 1D | rfft | fft-recur | trickB | 117.1 | 29.36 | 3 | 21 | 7 | 58 | 11 |
-| 8192 | us_1D_rfft_fft-iter_trickB | us | 1D | rfft | fft-iter | trickB | 117.2 | 29.36 | 3 | 21 | 7 | 58 | 11 |
-| 8192 | jnp_1D_rfft_jnp-fft_trickA | jnp | 1D | rfft | jnp-fft | trickA | 123.7 | 8.39 | 35 | 57 | 16 | 17 | 10 |
+| 8192 | us_1D_rfft_fft-recur_coupled | us | 1D | rfft | fft-recur | coupled | 107.8 | 12.58 | 5 | 40 | 17 | 31 | 12 |
+| 8192 | us_1D_rfft_fft-iter_coupled | us | 1D | rfft | fft-iter | coupled | 107.9 | 12.58 | 5 | 40 | 17 | 31 | 12 |
+| 8192 | us_1D_rfft_fft-recur_reduced | us | 1D | rfft | fft-recur | reduced | 117.1 | 29.36 | 3 | 21 | 7 | 58 | 11 |
+| 8192 | us_1D_rfft_fft-iter_reduced | us | 1D | rfft | fft-iter | reduced | 117.2 | 29.36 | 3 | 21 | 7 | 58 | 11 |
+| 8192 | jnp_1D_rfft_jnp-fft_coupled | jnp | 1D | rfft | jnp-fft | coupled | 123.7 | 8.39 | 35 | 57 | 16 | 17 | 10 |
 | 8192 | us_1D_fft_fft-recur | us | 1D | fft | fft-recur | — | 129.3 | 16.78 | 9 | 35 | 0 | 45 | 20 |
 | 8192 | us_1D_fft_fft-iter | us | 1D | fft | fft-iter | — | 129.3 | 16.78 | 9 | 35 | 0 | 45 | 20 |
-| 8192 | jnp_1D_rfft_jnp-fft_trickB | jnp | 1D | rfft | jnp-fft | trickB | 140.8 | 12.58 | 26 | 48 | 6 | 36 | 9 |
+| 8192 | jnp_1D_rfft_jnp-fft_reduced | jnp | 1D | rfft | jnp-fft | reduced | 140.8 | 12.58 | 26 | 48 | 6 | 36 | 9 |
 | 8192 | jnp_1D_rfft_jnp-fft | jnp | 1D | rfft | jnp-fft | — | 176.1 | 8.39 | 67 | 74 | 1 | 17 | 7 |
 | 8192 | jnp_1D_fft_jnp-fft | jnp | 1D | fft | jnp-fft | — | 187.4 | 8.39 | 72 | 70 | 0 | 16 | 14 |
 | 8192 | us_1D_rfft_direct-int8 | us | 1D | rfft | direct-int8 | — | 1051.8 | 25.17 | 89 | 9 | 91 | 1 | 0 |
@@ -99,15 +99,15 @@
 | 16384 | ★ us_1D_rfft_reim-int8 | us | 1D | rfft | reim-int8 | — | 145.4 | 8.39 | 15 | 33 | 7 | 60 | 0 |
 | 16384 | us_1D_rfft_reim-bf16 | us | 1D | rfft | reim-bf16 | — | 146.8 | 25.17 | 18 | 42 | 2 | 56 | 0 |
 | 16384 | us_1D_rfft_reim | us | 1D | rfft | reim | — | 171.2 | 50.33 | 11 | 36 | 2 | 62 | 0 |
-| 16384 | us_1D_rfft_fft-recur_trickA | us | 1D | rfft | fft-recur | trickA | 214.7 | 25.17 | 7 | 41 | 16 | 31 | 12 |
-| 16384 | us_1D_rfft_fft-iter_trickA | us | 1D | rfft | fft-iter | trickA | 214.8 | 25.17 | 7 | 41 | 16 | 31 | 12 |
+| 16384 | us_1D_rfft_fft-recur_coupled | us | 1D | rfft | fft-recur | coupled | 214.7 | 25.17 | 7 | 41 | 16 | 31 | 12 |
+| 16384 | us_1D_rfft_fft-iter_coupled | us | 1D | rfft | fft-iter | coupled | 214.8 | 25.17 | 7 | 41 | 16 | 31 | 12 |
 | 16384 | us_1D_rfft_conv-hlo | us | 1D | rfft | conv-hlo | — | 216.8 | 33.55 | 13 | 53 | 5 | 31 | 12 |
-| 16384 | jnp_1D_rfft_jnp-fft_trickA | jnp | 1D | rfft | jnp-fft | trickA | 244.3 | 16.78 | 41 | 47 | 14 | 28 | 11 |
-| 16384 | us_1D_rfft_fft-recur_trickB | us | 1D | rfft | fft-recur | trickB | 246.6 | 58.72 | 4 | 19 | 6 | 62 | 10 |
-| 16384 | us_1D_rfft_fft-iter_trickB | us | 1D | rfft | fft-iter | trickB | 246.7 | 58.72 | 4 | 19 | 6 | 62 | 10 |
+| 16384 | jnp_1D_rfft_jnp-fft_coupled | jnp | 1D | rfft | jnp-fft | coupled | 244.3 | 16.78 | 41 | 47 | 14 | 28 | 11 |
+| 16384 | us_1D_rfft_fft-recur_reduced | us | 1D | rfft | fft-recur | reduced | 246.6 | 58.72 | 4 | 19 | 6 | 62 | 10 |
+| 16384 | us_1D_rfft_fft-iter_reduced | us | 1D | rfft | fft-iter | reduced | 246.7 | 58.72 | 4 | 19 | 6 | 62 | 10 |
 | 16384 | us_1D_fft_fft-iter | us | 1D | fft | fft-iter | — | 259.8 | 33.55 | 12 | 35 | 0 | 45 | 20 |
 | 16384 | us_1D_fft_fft-recur | us | 1D | fft | fft-recur | — | 259.8 | 33.55 | 12 | 35 | 0 | 45 | 20 |
-| 16384 | jnp_1D_rfft_jnp-fft_trickB | jnp | 1D | rfft | jnp-fft | trickB | 299.6 | 25.17 | 32 | 52 | 6 | 34 | 9 |
+| 16384 | jnp_1D_rfft_jnp-fft_reduced | jnp | 1D | rfft | jnp-fft | reduced | 299.6 | 25.17 | 32 | 52 | 6 | 34 | 9 |
 | 16384 | jnp_1D_rfft_jnp-fft | jnp | 1D | rfft | jnp-fft | — | 311.4 | 16.78 | 89 | 72 | 1 | 19 | 8 |
 | 16384 | jnp_1D_fft_jnp-fft | jnp | 1D | fft | jnp-fft | — | 334.1 | 16.78 | 96 | 67 | 0 | 17 | 15 |
 | 16384 | us_1D_rfft_direct-int8 | us | 1D | rfft | direct-int8 | — | 4210.7 | 587.20 | 106 | 10 | 90 | 0 | 0 |
@@ -134,7 +134,7 @@ custom-call              9.3%  ███····················
 copy-start               0.2%  ····························
 copy-done                0.0%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickA  N=256** — device 10.0 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_coupled  N=256** — device 10.0 us/run, 15 runs
 ```
 convolution fusion      81.7%  ███████████████████████·····
 custom-call              8.1%  ██··························
@@ -146,7 +146,7 @@ copy-start               0.1%  ························�
 async-start              0.0%  ····························
 async-done               0.0%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickB  N=256** — device 6.6 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_reduced  N=256** — device 6.6 us/run, 15 runs
 ```
 convolution fusion      39.0%  ███████████·················
 slice                   15.4%  ████························
@@ -195,7 +195,7 @@ convolution fusion      31.9%  █████████···········
 copy-done                0.1%  ····························
 copy-start               0.1%  ····························
 ```
-**us_1D_rfft_fft-iter_trickA  N=256** — device 6.2 us/run, 15 runs
+**us_1D_rfft_fft-iter_coupled  N=256** — device 6.2 us/run, 15 runs
 ```
 convolution fusion      47.3%  █████████████···············
 loop fusion             18.0%  █████·······················
@@ -204,7 +204,7 @@ reverse                  9.3%  ███····················
 data formatting          8.7%  ██··························
 slice                    3.7%  █···························
 ```
-**us_1D_rfft_fft-iter_trickB  N=256** — device 4.9 us/run, 15 runs
+**us_1D_rfft_fft-iter_reduced  N=256** — device 4.9 us/run, 15 runs
 ```
 convolution fusion      37.7%  ███████████·················
 slice                   21.8%  ██████······················
@@ -216,7 +216,7 @@ copy-start               0.2%  ························�
 async-start              0.1%  ····························
 async-done               0.1%  ····························
 ```
-**us_1D_rfft_fft-recur_trickA  N=256** — device 6.2 us/run, 15 runs
+**us_1D_rfft_fft-recur_coupled  N=256** — device 6.2 us/run, 15 runs
 ```
 convolution fusion      47.8%  █████████████···············
 loop fusion             17.2%  █████·······················
@@ -225,7 +225,7 @@ reverse                  9.3%  ███····················
 data formatting          8.8%  ██··························
 slice                    3.8%  █···························
 ```
-**us_1D_rfft_fft-recur_trickB  N=256** — device 4.9 us/run, 15 runs
+**us_1D_rfft_fft-recur_reduced  N=256** — device 4.9 us/run, 15 runs
 ```
 convolution fusion      37.8%  ███████████·················
 slice                   20.5%  ██████······················
@@ -245,7 +245,7 @@ custom-call            100.0%  ████████████████�
 ```
 custom-call            100.0%  ████████████████████████████
 ```
-**us_1D_rfft_pallas_trickB  N=256** — device 4.0 us/run, 15 runs
+**us_1D_rfft_pallas_reduced  N=256** — device 4.0 us/run, 15 runs
 ```
 custom-call            100.0%  ████████████████████████████
 ```
@@ -281,7 +281,7 @@ data formatting         16.8%  █████·················
 custom-call              8.1%  ██··························
 loop fusion              1.5%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickA  N=1024** — device 17.3 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_coupled  N=1024** — device 17.3 us/run, 15 runs
 ```
 convolution fusion      55.7%  ████████████████············
 loop fusion             11.5%  ███·························
@@ -292,7 +292,7 @@ data formatting          4.9%  █·······················
 slice                    1.1%  ····························
 copy-start               0.0%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickB  N=1024** — device 23.4 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_reduced  N=1024** — device 23.4 us/run, 15 runs
 ```
 convolution fusion      53.8%  ███████████████·············
 slice                   15.3%  ████························
@@ -343,7 +343,7 @@ convolution fusion      14.8%  ████··················�
 copy-done                0.9%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-iter_trickA  N=1024** — device 15.1 us/run, 15 runs
+**us_1D_rfft_fft-iter_coupled  N=1024** — device 15.1 us/run, 15 runs
 ```
 convolution fusion      35.4%  ██████████··················
 loop fusion             17.9%  █████·······················
@@ -356,7 +356,7 @@ async-start              0.1%  ························�
 async-done               0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-iter_trickB  N=1024** — device 16.8 us/run, 15 runs
+**us_1D_rfft_fft-iter_reduced  N=1024** — device 16.8 us/run, 15 runs
 ```
 convolution fusion      24.9%  ███████·····················
 slice                   20.8%  ██████······················
@@ -369,7 +369,7 @@ copy-done                1.1%  ························�
 async-start              0.1%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-recur_trickA  N=1024** — device 15.1 us/run, 15 runs
+**us_1D_rfft_fft-recur_coupled  N=1024** — device 15.1 us/run, 15 runs
 ```
 convolution fusion      35.6%  ██████████··················
 loop fusion             17.6%  █████·······················
@@ -382,7 +382,7 @@ async-start              0.1%  ························�
 async-done               0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-recur_trickB  N=1024** — device 16.8 us/run, 15 runs
+**us_1D_rfft_fft-recur_reduced  N=1024** — device 16.8 us/run, 15 runs
 ```
 convolution fusion      24.9%  ███████·····················
 slice                   21.0%  ██████······················
@@ -403,7 +403,7 @@ custom-call            100.0%  ████████████████�
 ```
 custom-call            100.0%  ████████████████████████████
 ```
-**us_1D_rfft_pallas_trickB  N=1024** — device 35.9 us/run, 15 runs
+**us_1D_rfft_pallas_reduced  N=1024** — device 35.9 us/run, 15 runs
 ```
 custom-call            100.0%  ████████████████████████████
 ```
@@ -469,7 +469,7 @@ data formatting         18.2%  █████·················
 custom-call              7.8%  ██··························
 loop fusion              1.2%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickA  N=4096** — device 60.4 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_coupled  N=4096** — device 60.4 us/run, 15 runs
 ```
 convolution fusion      57.4%  ████████████████············
 loop fusion             14.0%  ████························
@@ -479,7 +479,7 @@ data formatting          5.4%  ██·····················�
 non-fusion elementwise   1.5%  ····························
 slice                    1.2%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickB  N=4096** — device 71.1 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_reduced  N=4096** — device 71.1 us/run, 15 runs
 ```
 convolution fusion      48.5%  ██████████████··············
 slice                   18.2%  █████·······················
@@ -524,7 +524,7 @@ async-start              0.0%  ························�
 loop fusion             91.1%  ██████████████████████████··
 convolution fusion       8.9%  ██··························
 ```
-**us_1D_rfft_fft-iter_trickA  N=4096** — device 54.0 us/run, 15 runs
+**us_1D_rfft_fft-iter_coupled  N=4096** — device 54.0 us/run, 15 runs
 ```
 convolution fusion      41.2%  ████████████················
 loop fusion             15.7%  ████························
@@ -537,7 +537,7 @@ async-start              0.0%  ························�
 async-done               0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-iter_trickB  N=4096** — device 60.3 us/run, 15 runs
+**us_1D_rfft_fft-iter_reduced  N=4096** — device 60.3 us/run, 15 runs
 ```
 convolution fusion      22.3%  ██████······················
 slice                   21.3%  ██████······················
@@ -550,7 +550,7 @@ async-done               2.3%  █·······················
 async-start              0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-recur_trickA  N=4096** — device 53.9 us/run, 15 runs
+**us_1D_rfft_fft-recur_coupled  N=4096** — device 53.9 us/run, 15 runs
 ```
 convolution fusion      41.2%  ████████████················
 loop fusion             15.7%  ████························
@@ -563,7 +563,7 @@ async-start              0.0%  ························�
 async-done               0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-recur_trickB  N=4096** — device 60.3 us/run, 15 runs
+**us_1D_rfft_fft-recur_reduced  N=4096** — device 60.3 us/run, 15 runs
 ```
 convolution fusion      22.3%  ██████······················
 slice                   21.2%  ██████······················
@@ -618,7 +618,7 @@ data formatting         17.3%  █████·················
 custom-call              7.3%  ██··························
 loop fusion              1.1%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickA  N=8192** — device 123.7 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_coupled  N=8192** — device 123.7 us/run, 15 runs
 ```
 convolution fusion      56.8%  ████████████████············
 loop fusion             14.9%  ████························
@@ -628,7 +628,7 @@ data formatting          6.5%  ██·····················�
 slice                    1.4%  ····························
 non-fusion elementwise   0.7%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickB  N=8192** — device 140.8 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_reduced  N=8192** — device 140.8 us/run, 15 runs
 ```
 convolution fusion      48.3%  ██████████████··············
 slice                   19.9%  ██████······················
@@ -675,7 +675,7 @@ convolution fusion       8.7%  ██·····················�
 copy-done                0.8%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-iter_trickA  N=8192** — device 107.9 us/run, 15 runs
+**us_1D_rfft_fft-iter_coupled  N=8192** — device 107.9 us/run, 15 runs
 ```
 convolution fusion      39.7%  ███████████·················
 loop fusion             17.1%  █████·······················
@@ -688,7 +688,7 @@ async-start              0.0%  ························�
 async-done               0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-iter_trickB  N=8192** — device 117.2 us/run, 15 runs
+**us_1D_rfft_fft-iter_reduced  N=8192** — device 117.2 us/run, 15 runs
 ```
 slice                   21.6%  ██████······················
 convolution fusion      21.3%  ██████······················
@@ -701,7 +701,7 @@ async-done               2.4%  █·······················
 async-start              0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-recur_trickA  N=8192** — device 107.8 us/run, 15 runs
+**us_1D_rfft_fft-recur_coupled  N=8192** — device 107.8 us/run, 15 runs
 ```
 convolution fusion      39.8%  ███████████·················
 loop fusion             17.1%  █████·······················
@@ -714,7 +714,7 @@ async-start              0.0%  ························�
 async-done               0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-recur_trickB  N=8192** — device 117.1 us/run, 15 runs
+**us_1D_rfft_fft-recur_reduced  N=8192** — device 117.1 us/run, 15 runs
 ```
 slice                   21.7%  ██████······················
 convolution fusion      21.3%  ██████······················
@@ -789,7 +789,7 @@ data formatting         18.8%  █████·················
 custom-call              8.3%  ██··························
 loop fusion              1.2%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickA  N=16384** — device 244.3 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_coupled  N=16384** — device 244.3 us/run, 15 runs
 ```
 convolution fusion      47.4%  █████████████···············
 data formatting         16.8%  █████·······················
@@ -799,7 +799,7 @@ reverse                  9.4%  ███····················
 slice                    1.5%  ····························
 non-fusion elementwise   0.7%  ····························
 ```
-**jnp_1D_rfft_jnp-fft_trickB  N=16384** — device 299.6 us/run, 15 runs
+**jnp_1D_rfft_jnp-fft_reduced  N=16384** — device 299.6 us/run, 15 runs
 ```
 convolution fusion      51.6%  ██████████████··············
 slice                   17.5%  █████·······················
@@ -846,7 +846,7 @@ convolution fusion       9.8%  ███····················
 copy-done                0.5%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-iter_trickA  N=16384** — device 214.8 us/run, 15 runs
+**us_1D_rfft_fft-iter_coupled  N=16384** — device 214.8 us/run, 15 runs
 ```
 convolution fusion      40.9%  ███████████·················
 loop fusion             16.0%  ████························
@@ -859,7 +859,7 @@ async-start              0.0%  ························�
 async-done               0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-iter_trickB  N=16384** — device 246.7 us/run, 15 runs
+**us_1D_rfft_fft-iter_reduced  N=16384** — device 246.7 us/run, 15 runs
 ```
 slice                   21.2%  ██████······················
 data formatting         20.3%  ██████······················
@@ -872,7 +872,7 @@ async-done               2.3%  █·······················
 async-start              0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-recur_trickA  N=16384** — device 214.7 us/run, 15 runs
+**us_1D_rfft_fft-recur_coupled  N=16384** — device 214.7 us/run, 15 runs
 ```
 convolution fusion      40.9%  ███████████·················
 loop fusion             16.0%  ████························
@@ -885,7 +885,7 @@ async-start              0.0%  ························�
 async-done               0.0%  ····························
 copy-start               0.0%  ····························
 ```
-**us_1D_rfft_fft-recur_trickB  N=16384** — device 246.6 us/run, 15 runs
+**us_1D_rfft_fft-recur_reduced  N=16384** — device 246.6 us/run, 15 runs
 ```
 slice                   21.2%  ██████······················
 data formatting         20.3%  ██████······················
@@ -968,7 +968,7 @@ custom-call              0.0%  ························�
 
 | N | fastest usable | µs | why |
 |---|---|---|---|
-| 256 | pallas_trickB / reim-bf16 | 4.0 / 6.0 | tiny transform; VMEM kernel + fixed overhead |
+| 256 | pallas_reduced / reim-bf16 | 4.0 / 6.0 | tiny transform; VMEM kernel + fixed overhead |
 | 1024 | **pallas** (VMEM-resident) | **7.8** | whole FFT in ONE fused kernel — no HBM round-trips |
 | 4096 | **pallas-bf16** | **23.7** | VMEM-resident + half operand bytes |
 | 8192 | **reim-bf16** | **69.0** | pallas OOMs VMEM here; bf16 halves HBM |

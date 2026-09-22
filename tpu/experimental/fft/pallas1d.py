@@ -5,7 +5,7 @@ Both public kernels take REAL input (N, K); they differ only in output length:
     pallas_full  -> all N bins        pallas_half  -> first N//2 bins (Hermitian rfft)
 The whole transform runs in ONE kernel with the working set resident in VMEM, so the only HBM
 traffic is: read the input once, write the output once (intermediates never leave VMEM).
-pallas_trickB is the Trick-B variant with a self-made (Mosaic-lowerable) row reversal.
+pallas_reduced is the `reduced` variant with a self-made (Mosaic-lowerable) row reversal.
 Numerics come from fft/core.py (imported here under their old short aliases).
 """
 from functools import partial
@@ -73,7 +73,7 @@ def pallas_hbm_bytes(N, K, half=False, dt=F):
 
 
 # ── Trick B (even/odd) with self-made row reversal ───────────────────────────
-def _trickB(xr, N):
+def _reduced(xr, N):
     """Even/odd -> half-length FFT -> self-made mirror -> twist.  Returns first N//2 bins."""
     h, batch = N // 2, xr.shape[1]
     x2 = xr.reshape(h, 2, batch)
@@ -89,19 +89,19 @@ def _trickB(xr, N):
     return Er + (twr * Or_ - twi * Oi), Ei + (twr * Oi + twi * Or_)  # X[k]=E[k]+W_N^k O[k]
 
 
-def _trickB_kernel(xr_ref, yr_ref, yi_ref, *, N):
-    yr_ref[...], yi_ref[...] = _trickB(xr_ref[...], N)
+def _reduced_kernel(xr_ref, yr_ref, yi_ref, *, N):
+    yr_ref[...], yi_ref[...] = _reduced(xr_ref[...], N)
 
 
-def pallas_trickB(xr, K_TILE=128, interpret=True, dt=F):
+def pallas_reduced(xr, K_TILE=128, interpret=True, dt=F):
     """Real (N, K) -> HALF spectrum via Trick B + self-made reversal.  Correct and lowers, but
     the O(N^2) mirror makes it slower than pallas_half.  (dt accepted for a uniform interface;
-    the Trick-B path runs in f32.)"""
+    the `reduced` path runs in f32.)"""
     xr = xr.astype(F)
     N, K = xr.shape
     h = N // 2
     return pl.pallas_call(
-        partial(_trickB_kernel, N=N),
+        partial(_reduced_kernel, N=N),
         grid=(K // K_TILE,),
         in_specs=[pl.BlockSpec((N, K_TILE), lambda k: (0, k))],
         out_specs=[pl.BlockSpec((h, K_TILE), lambda k: (0, k))] * 2,

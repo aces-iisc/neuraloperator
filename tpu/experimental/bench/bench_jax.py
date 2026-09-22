@@ -38,15 +38,15 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from ...fft.rfft1d import rfft_full as fft_reim, rfft_half as jax_rfft
+from ...fft.rfft1d import rfft_full as fft_reim, rfft_half
 from ..fft.tricks import (
     jax_rfft_int8,
-    rfft_trickA,
-    rfft_trickA_reim,
-    rfft_trickB,
-    rfft_trickB_reim,
+    rfft_coupled,
+    rfft_coupled_reim,
+    rfft_reduced,
+    rfft_reduced_reim,
 )
-from ..fft.pallas1d import pallas_full, pallas_half, pallas_trickB
+from ..fft.pallas1d import pallas_full, pallas_half, pallas_reduced
 from ...fft.rfft2d import rfft2_full as jax_rfft2, rfft2_low_modes as rfft2_partial
 from ..fft.pallas2d import pallas_rfft2
 from ...fft.core import BF, F, I8
@@ -81,25 +81,25 @@ _cfft = {"jnp-fft": lambda z: jnp.fft.fft(z, axis=0)}
 # NAME = {who}_{dim}_{compute}_{method}[_{trick}]  — one field per axis:
 #   who us|jnp ; dim 1D|2D ; compute fft(full)|rfft(real-half)
 #   method  fft-iter|fft-recur|jnp-fft (complex engines tricks wrap) ; reim|conv-hlo|pallas|
-#           direct-int8|partial (direct real) ; trailing -bf16 = bf16 ; trick trickA|trickB
+#           direct-int8|partial (direct real) ; trailing -bf16 = bf16 ; trick coupled|reduced
 ENGINES = {
     # -- 1D full complex FFT (ours carry real/imag -> no complex64) --
     "us_1D_fft_reim":           _e(fft_reim),
     "us_1D_fft_pallas":         _e(lambda xr: pallas_full(xr, K_TILE, _ITP, F)),
     "jnp_1D_fft_jnp-fft":       _e(lambda xr: jnp.fft.fft(xr.astype(C), axis=0)),  # jnp reference (c64)
     # -- 1D rfft, direct (no trick) --
-    "us_1D_rfft_reim":          _e(lambda xr: jax_rfft(xr, True, F)),
-    "us_1D_rfft_reim-bf16":     _e(lambda xr: jax_rfft(xr.astype(BF), True, BF), dt=BF),
-    "us_1D_rfft_reim-int8":     _e(lambda xr: jax_rfft(xr.astype(I8), True, I8), dt=I8),  # naive int8, same as bf16
+    "us_1D_rfft_reim":          _e(lambda xr: rfft_half(xr, F)),
+    "us_1D_rfft_reim-bf16":     _e(lambda xr: rfft_half(xr.astype(BF), BF), dt=BF),
+    "us_1D_rfft_reim-int8":     _e(lambda xr: rfft_half(xr.astype(I8), I8), dt=I8),  # naive int8, same as bf16
     "us_1D_rfft_direct-int8":   _e(lambda xr: jax_rfft_int8(xr, True)),
     "us_1D_rfft_conv-hlo":      _e(_rfft_hlo_auto),
     "us_1D_rfft_pallas":        _e(lambda xr: pallas_half(xr, K_TILE, _ITP, F)),
     "us_1D_rfft_pallas-bf16":   _e(lambda xr: pallas_half(xr, K_TILE, _ITP, BF), dt=BF),
-    "us_1D_rfft_pallas_trickB": _e(lambda xr: pallas_trickB(xr, K_TILE, _ITP, F)),
+    "us_1D_rfft_pallas_reduced": _e(lambda xr: pallas_reduced(xr, K_TILE, _ITP, F)),
     "jnp_1D_rfft_jnp-fft":      _e(lambda xr: jnp.fft.rfft(xr, axis=0)),
     # -- 1D rfft tricks that stay REAL/IMAG (no complex64, no c64 custom-call) --
-    "us_1D_rfft_reimtrick_trickA": _e(lambda xr: rfft_trickA_reim(xr, 0.5, F)),
-    "us_1D_rfft_reimtrick_trickB": _e(lambda xr: rfft_trickB_reim(xr, 0.5, F)),
+    "us_1D_rfft_reimtrick_coupled": _e(lambda xr: rfft_coupled_reim(xr, 0.5, F)),
+    "us_1D_rfft_reimtrick_reduced": _e(lambda xr: rfft_reduced_reim(xr, 0.5, F)),
     # -- 2D rfft / fft --
     "us_2D_rfft_reim":          _e(jax_rfft2, dim=2),
     "us_2D_rfft_reim-bf16":     _e(lambda xr: jax_rfft2(xr.astype(BF), BF), dim=2, dt=BF),
@@ -109,10 +109,10 @@ ENGINES = {
     "jnp_2D_rfft_jnp-fft":      _e(lambda xr: jnp.fft.rfft2(xr, axes=(0, 1)), dim=2),
     "jnp_2D_fft_jnp-fft":       _e(lambda xr: jnp.fft.fft2(xr.astype(C), axes=(0, 1)), dim=2),
 }
-for _m, _eng in _cfft.items():  # 1D rfft tricks = {trickA,trickB} x {fft-iter,fft-recur,jnp-fft}
+for _m, _eng in _cfft.items():  # 1D rfft tricks = {coupled,reduced} x {fft-iter,fft-recur,jnp-fft}
     _who = "jnp" if _m == "jnp-fft" else "us"
-    ENGINES[f"{_who}_1D_rfft_{_m}_trickA"] = _e(lambda xr, e=_eng: rfft_trickA(xr, e))
-    ENGINES[f"{_who}_1D_rfft_{_m}_trickB"] = _e(lambda xr, e=_eng: rfft_trickB(xr, e))
+    ENGINES[f"{_who}_1D_rfft_{_m}_coupled"] = _e(lambda xr, e=_eng: rfft_coupled(xr, e))
+    ENGINES[f"{_who}_1D_rfft_{_m}_reduced"] = _e(lambda xr, e=_eng: rfft_reduced(xr, e))
 
 
 def _pick(*subs):  # engine names containing ALL substrings (preserves registry order)
@@ -168,7 +168,7 @@ def _is_nlabel(s):
 
 def _parse_engine(name):
     """Split a systematic engine name `{who}_{dim}_{compute}_{method}[_{trick}]` into its parts
-    for per-column reporting:  us_1D_rfft_fft-iter_trickA -> (us, 1D, rfft, fft-iter, trickA).
+    for per-column reporting:  us_1D_rfft_fft-iter_coupled -> (us, 1D, rfft, fft-iter, coupled).
     The FULL name stays the primary key; these are just the broken-out facets."""
     p = name.split("_")
     who = p[0] if len(p) > 0 else name

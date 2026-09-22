@@ -14,6 +14,7 @@ import pytest
 
 from ..experimental.fno import reference
 from ..fft import core, rfft1d, rfft2d
+from ..fft.core import F
 from ..fno import layers, model, spectral, train
 
 SHAPES = [(32, 32, 8), (64, 64, 12), (17, 16, 6)]
@@ -125,3 +126,23 @@ def test_hybrid_matches_the_main_low_mode_transform():
     got_re, got_im = rfft2_hybrid.rfft2_hybrid(field, want_re.shape[0], want_re.shape[1])
     assert _rel(got_re, want_re) < 1e-4
     assert _rel(got_im, want_im) < 1e-4
+
+
+def test_entry_point_signatures_match_the_bench_call_sites():
+    """The benches and experimental modules call these with positional dtype/ratio args.
+    Renaming a parameter breaks them silently, since the benches swallow their own errors —
+    so pin the exact call shapes they use."""
+    from ..fft.core import BF
+    from ..fft.rfft1d import rfft_full, rfft_half, rfft_low_modes
+    from ..fft.rfft2d import rfft2_full, rfft2_low_modes
+
+    x = jnp.asarray(np.random.default_rng(13).standard_normal((256, 8)), jnp.float32)
+    field = jnp.asarray(np.random.default_rng(14).standard_normal((128, 32, 4)), jnp.float32)
+
+    rfft_half(x, F)                              # bench/fft_engines.py, bench_jax.py
+    rfft_half(x.astype(BF), BF)                  # bench_jax.py, the bf16 engine
+    rfft_full(x)                                 # bench_jax.py
+    rfft_low_modes(x, 8)                         # bench/fft_engines.py
+    rfft2_full(field, F)                         # bench/fft_engines.py, hybrid2d.py
+    rfft2_low_modes(field, 0.5, F)               # bench/fft_engines.py
+    rfft2_low_modes(field.astype(BF), 0.5, BF)   # bench_jax.py

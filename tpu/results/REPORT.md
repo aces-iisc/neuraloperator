@@ -9,7 +9,7 @@ estimated.
 
 ## 1. Which 1-D FFT is fastest (device µs/run, K=256)
 
-| N | reim-bf16 | reim | pallas (VMEM) | conv-hlo | trickA | jnp.rfft |
+| N | reim-bf16 | reim | pallas (VMEM) | conv-hlo | coupled | jnp.rfft |
 |---|---|---|---|---|---|---|
 | 1024 | **8.1** | 9.6 | ★7.8 | 12.5 | 15.1 | 23.0 |
 | 4096 | ★**26.2** | 31.3 | (OOM) | 44.4 | 54.0 | 88.6 |
@@ -19,7 +19,7 @@ estimated.
 **Why:** the transform is **memory-bound** (arithmetic intensity 4–13 ≪ 240 ridge), so the winner
 is whoever moves the fewest bytes. `reim-bf16` halves operand bytes → ½ HBM → fastest at every
 N≥1024. `pallas` (whole FFT resident in VMEM, one HBM read/write) wins at small N but **OOMs the
-16 MB VMEM above 4096**. Packing tricks (trickA/B) lose to native `reim` because pack/unpack costs
+16 MB VMEM above 4096**. Packing tricks (coupled/reduced) lose to native `reim` because pack/unpack costs
 more than it saves. `jnp.rfft` is slowest — it pays a `complex64` assembly tax + more copies.
 
 ---

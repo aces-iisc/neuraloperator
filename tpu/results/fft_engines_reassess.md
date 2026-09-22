@@ -4,8 +4,8 @@ Median blocked wall-clock µs/run, K=256 batch (µs/sample = /256 in parens). us
 All engines real/imag — **complex64 op-count = 0** (no c64 conversion; the uniform "1" from the
 substring counter is incidental HLO metadata, not a complex op). Ratio 0.5 (half spectrum / low modes).
 
-## 1D rfft — FAIR comparison (part-half computes the SAME N/2 modes as reim/trickA/trickB)
-| N | reim | trickA | trickB | part-m16 (16 modes) | part-half (N/2 modes) |
+## 1D rfft — FAIR comparison (part-half computes the SAME N/2 modes as reim/coupled/reduced)
+| N | reim | coupled | reduced | part-m16 (16 modes) | part-half (N/2 modes) |
 |---|---|---|---|---|---|
 | 1,024 | 193.6 | 193.2 | 197.2 | 179.3 | 216.3 |
 | 4,096 | **247.8** | 259.6 | 266.8 | 189.7 | 848.7 (3.4× slower) |
@@ -19,7 +19,7 @@ At EQUAL mode count (N/2), the partial is **catastrophically slower** — 150× 
 O(N·log₁₂₈N), near-linear — that is what the FFT is for.
 - Partial is the fast path ONLY when m ≪ N (a handful of modes) — the FNO regime (~16 modes).
   There part-m16 stays ~1 pass over x and is fast. It is NOT a faster general FFT.
-- For the full/half spectrum, reim/trickA win decisively (by the whole N²/(N log N) factor).
+- For the full/half spectrum, reim/coupled win decisively (by the whole N²/(N log N) factor).
 Validated vs jnp.fft.rfft[:m] (rel_err ~1e-6).
 
 ## 2D caveat (same lens)
@@ -72,8 +72,8 @@ CONCLUSION: rfft2_partial (direct low-mode matmul) is the right FFT primitive fo
    1D ≥4096 and 2D ≥64² (2D ≥128² hangs Mosaic → never run there). Dead end for large N.
 3. **2D partial is the decisive winner** — 3.7× at 256², 2.5× at 512², gap widens with N.
    Memory-bound → fewer modes = fewer bytes = faster. (Sharpens the earlier 4.2× one-point result.)
-4. **1D trickA has a sweet spot** — 1.7× at 65,536 vs reim; but reim edges back at the extreme top
-   (262K). trickB never wins.
+4. **1D coupled has a sweet spot** — 1.7× at 65,536 vs reim; but reim edges back at the extreme top
+   (262K). reduced never wins.
 5. **No complex64 tax** anywhere — the no-c64 property held for every engine.
 
 Bench: `tpu/experimental/bench_fft_engines.py`.
@@ -85,12 +85,12 @@ rfft2_hybrid: FULL staged real rfft on axis-0 (all cols), keep low m1; PARTIAL d
 |---|---|---|
 | partial (both axes) | 648.7 | 166.6 |
 | **hybrid-reim** | **407.7 (1.6x faster)** | 166.3 |
-| hybrid-trickA | 910.0 | 171.0 |
+| hybrid-coupled | 910.0 | 171.0 |
 | reim (full both) | 1181.3 | 168.4 |
 WHY: partial does a SKINNY (m x N)=(16x128) matmul on BOTH axes -> wastes 7/8 of the 128x128 MXU.
 The hybrid does axis-0 (the big N2*K=131072-column pass) as a FULL staged rfft (full-tile MXU
 efficiency), and keeps the skinny partial only on axis-1 (tiny, over m1*K elements). Full-MXU big
-axis + cheap small axis = 1.6x. "Trick or not": NO trick — hybrid-trickA (910) is 2.2x slower than
+axis + cheap small axis = 1.6x. "Trick or not": NO trick — hybrid-coupled (910) is 2.2x slower than
 hybrid-reim (408); packing overhead outweighs the real halving on TPU.
 => Candidate to replace rfft2_partial's axis-0 in the FNO spectral conv for ~1.6x faster FFT.
 
@@ -100,12 +100,12 @@ hybrid-reim (408); packing overhead outweighs the real halving on TPU.
 | reim (staged) | partial | **408.7** | WINNER (1.57x over all-partial) |
 | reim | staged-FFT + truncate | 448.7 | "truncated reim rows" — LOSES by 10% |
 | partial | partial | 640.4 | old incumbent |
-| trickA | partial | 915.5 | |
+| coupled | partial | 915.5 | |
 | reim | full direct DFT | 1198.3 | |
-| trickB | partial | 1729.1 | worst (heaviest pack/unpack) |
+| reduced | partial | 1729.1 | worst (heaviest pack/unpack) |
 Darcy 32^2: all ~180-200 us (dispatch floor, indistinguishable).
 CONCLUSIONS:
-- Big axis (huge N2*K batch): full reim FFT, NO trick (trickA/B both 2.2-4.2x slower — pack/unpack
+- Big axis (huge N2*K batch): full reim FFT, NO trick (coupled/B both 2.2-4.2x slower — pack/unpack
   is memory-heavy; at N=128 the FFT is 1 MXU-perfect stage so the fixed unpack overhead dominates).
 - Small axis (few rows): skinny partial. Staging it (transpose + compute-all-then-slice) loses 10%.
 - Optimal low-mode 2D transform = reim cols + partial rows = 1.57x faster than all-partial.

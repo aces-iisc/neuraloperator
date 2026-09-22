@@ -22,7 +22,7 @@ import jax
 import jax.numpy as jnp
 
 from ...fft.core import ACC, F
-from ...fft.rfft1d import rfft_half as jax_rfft
+from ...fft.rfft1d import rfft_half
 
 
 #  Layer 1 — spectral_conv   (the Fourier "R" operator, built on reim)
@@ -51,9 +51,9 @@ def spectral_conv_apply(p, x, dt=F):
     complex channel-mix; inverse = reim-style partial-IDFT matmul."""
     m = p["w_re"].shape[-1]
     B, Cin, N = x.shape
-    # forward reim rfft along N (jax_rfft wants (N, batch)); batch = B*Cin
+    # forward reim rfft along N (rfft_half wants (N, batch)); batch = B*Cin
     xr = x.reshape(B * Cin, N).T.astype(dt)                 # (N, B*Cin)
-    Yr, Yi = jax_rfft(xr, half=True, dt=dt)                 # (N//2, B*Cin) real/imag
+    Yr, Yi = rfft_half(xr, dt)                 # (N//2, B*Cin) real/imag
     Yr = Yr[:m].T.reshape(B, Cin, m).astype(F)             # (B, Cin, m)
     Yi = Yi[:m].T.reshape(B, Cin, m).astype(F)
     # complex channel mix per mode:  (Wr+iWi)(Yr+iYi)

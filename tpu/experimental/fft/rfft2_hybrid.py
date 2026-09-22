@@ -8,7 +8,7 @@ import jax.numpy as jnp
 
 from ...fft.core import (ACC, F, complex_matmul as _karatsuba,
                          fft_staged_complex as _fft_c, rfft_staged as _fft_reim_real)
-from .tricks import rfft_trickA_reim, rfft_trickB_reim
+from .tricks import rfft_coupled_reim, rfft_reduced_reim
 
 
 def rfft2_hybrid(xr, m1, m2, axis0="reim", rows="partial", dt=F):
@@ -16,13 +16,13 @@ def rfft2_hybrid(xr, m1, m2, axis0="reim", rows="partial", dt=F):
       rows='partial' -> PARTIAL direct DFT on axis-1 (skinny (m2 x N2), only the low m2) [the winner]
       rows='staged'  -> full STAGED FFT on axis-1 (transpose, _fft_c) then TRUNCATE to m2 (computes
                         all modes then slices — the 'truncated reim rows' variant to test)
-    axis0='reim' (staged rfft) or 'trickA'.  (N1,N2,K) -> (yr,yi), each (m1,m2,K)."""
+    axis0='reim' (staged rfft) or 'coupled'.  (N1,N2,K) -> (yr,yi), each (m1,m2,K)."""
     N1, N2, K = xr.shape
     x2 = xr.reshape(N1, N2 * K)
-    if axis0 == "trickA":
-        Ar, Ai = rfft_trickA_reim(x2, m1 / N1, dt)               # full real rfft (trick A), m1 modes
-    elif axis0 == "trickB":
-        Ar, Ai = rfft_trickB_reim(x2, m1 / N1, dt)               # full real rfft (trick B), m1 modes
+    if axis0 == "coupled":
+        Ar, Ai = rfft_coupled_reim(x2, m1 / N1, dt)               # full real rfft (coupled), m1 modes
+    elif axis0 == "reduced":
+        Ar, Ai = rfft_reduced_reim(x2, m1 / N1, dt)               # full real rfft (reduced), m1 modes
     else:
         Ar, Ai = _fft_reim_real(x2, N1, half=True, dtype=dt)        # full staged real rfft
     Ar, Ai = Ar[:m1].reshape(m1, N2, K), Ai[:m1].reshape(m1, N2, K)   # keep low m1 col-modes

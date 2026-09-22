@@ -23,7 +23,7 @@ C = jnp.complex64
 def _mirror(Z):                       # conj(Z[(M-k) mod M]) along axis 0 — Hermitian partner
     return jnp.conj(jnp.roll(Z[::-1], 1, axis=0))
 
-def rfft_trickA(xr, eng):             # (N, K) real -> (N//2+1, K)
+def rfft_coupled(xr, eng):             # (N, K) real -> (N//2+1, K)
     N, K = xr.shape
     a, b = xr[:, :K//2], xr[:, K//2:]                 # pair signals: a,b are (N, K/2)
     Z = eng((a + 1j*b).astype(C))                     # ONE FFT on K/2 cols -> (N, K/2)
@@ -32,7 +32,7 @@ def rfft_trickA(xr, eng):             # (N, K) real -> (N//2+1, K)
     Bb = (-0.5j*(Z - M))[:N//2+1]                     # rfft(b): (N//2+1, K/2)
     return jnp.concatenate([A, Bb], axis=1)           # (N//2+1, K)
 
-def rfft_trickB(xr, eng):             # (N, K) real -> (N//2+1, K)
+def rfft_reduced(xr, eng):             # (N, K) real -> (N//2+1, K)
     N, K = xr.shape; h = N//2
     z = (xr[0::2] + 1j*xr[1::2]).astype(C)            # (h, K) even + i*odd
     Z = eng(z)                                        # HALF-length FFT -> (h, K)
@@ -53,11 +53,11 @@ own purpose-built real FFT, as an independent baseline.
 |---|---|---|---|---|---|---|
 | 16384 | **jnp.NATIVE rfft** | 1.6e-07 | **25.2M** | — | 117M | — |
 | 16384 | jnpfft · base | 1.6e-07 | 41.9M | 1.00 | 118M | 1.00 |
-| 16384 | jnpfft · trickA | 1.7e-07 | 37.8M | 0.90 | 65.0M | 0.55 |
-| 16384 | jnpfft · trickB | 1.8e-07 | 37.9M | 0.90 | 62.1M | 0.52 |
+| 16384 | jnpfft · coupled | 1.7e-07 | 37.8M | 0.90 | 65.0M | 0.55 |
+| 16384 | jnpfft · reduced | 1.8e-07 | 37.9M | 0.90 | 62.1M | 0.52 |
 | 16384 | fft_iter · base | 1.6e-05 | 76.2M | 1.00 | 540M | 1.00 |
-| 16384 | **fft_iter · trickA** | 1.7e-05 | **55.2M** | **0.72** | 276M | **0.51** |
-| 16384 | **fft_iter · trickB** | 1.6e-05 | **55.1M** | **0.72** | 210M | **0.39** |
+| 16384 | **fft_iter · coupled** | 1.7e-05 | **55.2M** | **0.72** | 276M | **0.51** |
+| 16384 | **fft_iter · reduced** | 1.6e-05 | **55.1M** | **0.72** | 210M | **0.39** |
 
 Across N (bytes ×base / flops ×base):
 

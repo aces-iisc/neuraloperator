@@ -109,7 +109,7 @@ def rfft_staged(signal, n, half=True, dtype=F):
 
 def fft_staged_complex(x_re, x_im, n):
     """Radix-RADIX FFT of COMPLEX columns (Karatsuba on every stage, including the first), full
-    n-bin output.  Used by the packing tricks and the Trick-B Pallas kernel."""
+    n-bin output.  Used by the packing schemes and the `reduced` Pallas kernel."""
     cur_re, cur_im = x_re, x_im
     length, batch, stages = n, x_re.shape[1], []
 
