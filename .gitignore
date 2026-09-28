@@ -91,3 +91,5 @@ neuralop/datasets/data/nsforcing_128.tgz
 tpu/traces/
 *.xplane.pb
 *.trace.json.gz
+/tpu/results/modes
+/tpu/results/baseline

@@ -16,10 +16,13 @@ The winners live in fft/rfft1d.py.
 import jax
 import jax.numpy as jnp
 
-from ...fft.core import (CDTYPE, I8, I32, F, RADIX as B, dft_matrix,
+from ...fft.core import (CDTYPE, I8, I32, F, RADIX as B,
+                         complex_matmul as _karatsuba, dft_matrix,
                          fft_staged_complex as _fft_c)
 
 C = CDTYPE  # local alias (complex64)
+
+_MAT_TRICK = lambda mat, x: jnp.matmul(mat, x, preferred_element_type=jnp.float32)
 
 
 # ── complex64 radix-B FFT (iterative + recursive): reference algorithms, NOT wired into any engine
@@ -229,3 +232,37 @@ def full_via_reduced(xr, eng):
 _FULL = {"recompute": full_recompute,
          "viacoupled": full_via_coupled,
          "viareduced": full_via_reduced}
+
+
+def rfft_coupled_low_modes(xr, n_modes, dt=F):
+    """The coupled packing applied to a LOW-MODE transform: pair the K real signals into K/2
+    complex ones, compute only the rows the unpack needs, then separate them.
+
+    The catch is the unpack.  Recovering A[k] and B[k] needs both Z[k] and its mirror
+    Z[(N-k) mod N], so a band of m modes forces us to evaluate 2m-1 rows of the DFT matrix
+    (k = 0..m-1 plus N-1..N-m+1), not m.  Half as many signals, but a matrix with twice the rows,
+    and the complex matmul costs 3 real matmuls where a real partial DFT costs 2 --
+    so this does about 1.5x the arithmetic of fft.rfft1d.rfft_low_modes for the same output.
+    Whether that matters is a memory question, which is why it is worth measuring rather than
+    arguing about.  Real (N, K), K even -> (re, im), each (n_modes, K)."""
+    n, k_cols = xr.shape
+    a, b = xr[:, :k_cols // 2], xr[:, k_cols // 2:]
+
+    low = jnp.arange(n_modes)                      # k = 0 .. m-1
+    mirror = (n - jnp.arange(1, n_modes)) % n      # the partners N-1 .. N-m+1
+    rows = jnp.concatenate([low, mirror])          # 2m-1 rows in total
+
+    angle = -2.0 * jnp.pi * jnp.outer(rows, jnp.arange(n)).astype(F) / n
+    cos, sin = jnp.cos(angle).astype(dt), jnp.sin(angle).astype(dt)
+    z_re, z_im = _karatsuba(_MAT_TRICK, cos, sin, (cos + sin).astype(dt),
+                            a.astype(dt), b.astype(dt))
+
+    # Z[k] for k = 0..m-1, and Z[(N-k) mod N] (k=0 is its own mirror, so it reuses row 0)
+    zr, zi = z_re[:n_modes], z_im[:n_modes]
+    mr = jnp.concatenate([z_re[:1], z_re[n_modes:]], axis=0)
+    mi = jnp.concatenate([z_im[:1], z_im[n_modes:]], axis=0)
+
+    a_re, a_im = 0.5 * (zr + mr), 0.5 * (zi - mi)          # A = (Z + conj(Z_mirror)) / 2
+    b_re, b_im = 0.5 * (zi + mi), -0.5 * (zr - mr)         # B = (Z - conj(Z_mirror)) / 2i
+    return (jnp.concatenate([a_re, b_re], axis=1).astype(dt),
+            jnp.concatenate([a_im, b_im], axis=1).astype(dt))

@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-from .core import F, rfft_staged
+from .core import F, dft_matrix_reim, rfft_staged
 
 
 def rfft_full(signal):
@@ -27,8 +27,19 @@ def rfft_low_modes(signal, n_modes, dtype=F):
     which is the winning trade while the transform is memory-bound.  1-D analogue of
     rfft2d.rfft2_low_modes."""
     n = signal.shape[0]
-    angle = -2.0 * jnp.pi * jnp.outer(jnp.arange(n_modes, dtype=F), jnp.arange(n, dtype=F)) / n
+    angle = -2.0 * jnp.pi * jnp.outer(jnp.arange(n_modes), jnp.arange(n)).astype(F) / n
     dft_cos, dft_sin = jnp.cos(angle).astype(dtype), jnp.sin(angle).astype(dtype)
     x = signal.astype(dtype)
     return (jnp.matmul(dft_cos, x, preferred_element_type=jnp.float32),
             jnp.matmul(dft_sin, x, preferred_element_type=jnp.float32))
+
+
+def rfft_direct(signal, half=True, dtype=F):
+    """One n x n DFT, no staging. O(n^2) arithmetic but every MXU tile is full, which wins at
+    small n where staging leaves a starved leaf. Real (n, batch) -> (re, im)."""
+    n = signal.shape[0]
+    cos, sin, _ = dft_matrix_reim(n, dtype)
+    x = signal.astype(dtype)
+    re = jnp.matmul(cos, x, preferred_element_type=jnp.float32)
+    im = jnp.matmul(sin, x, preferred_element_type=jnp.float32)
+    return (re[:n // 2], im[:n // 2]) if half else (re, im)

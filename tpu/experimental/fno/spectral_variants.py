@@ -6,12 +6,13 @@ from ...fno.spectral import _dft_rows as _rows
 _E = lambda spec, mat, x: jnp.einsum(spec, mat, x, preferred_element_type=ACC)
 
 
-def spectral_2corner_hybrid(w, x, m):
+def spectral_2corner_hybrid(w, x, n_modes):
     """Same 2-corner spectral conv as spectral_2corner, but axis-0 uses the FULL (H×H) DFT (a full
     128×128 MXU matmul at 100% utilization) and then SELECTS the ±m band — instead of the skinny
     (2m×H) partial matmul that wastes most of the MXU.  axis-0 is the big-batch axis (n·c·W columns),
     so full-MXU efficiency there wins (the measured 'reim cols + partial rows' hybrid).  Identical
     output to spectral_2corner (same modes).  axis-1 stays partial; inverse unchanged."""
+    m = n_modes // 2        # n_modes counts both corners
     H, W = x.shape[-2], x.shape[-1]
     x = x.astype(F)
     k1 = jnp.concatenate([jnp.arange(m), jnp.arange(H - m, H)])   # ± band, 2m indices
@@ -44,11 +45,12 @@ def spectral_2corner_hybrid(w, x, m):
     return (u / (H * W)).astype(F)
 
 
-def spectral_2corner_herm(w, x, m):
+def spectral_2corner_herm(w, x, n_modes):
     """Same 2-corner conv, but exploit HERMITIAN symmetry of the real axis-0 transform:
     X[H-k] = conj(X[k]).  So compute ONLY the low-positive modes X[0..m] (m+1 rows) with a
     ((m+1)×H) DFT, then get the NEGATIVE (top) corner FREE as the conjugate — halving the axis-0
     forward matmul rows (m+1 vs 2m).  Same modes/output as spectral_2corner."""
+    m = n_modes // 2        # n_modes counts both corners
 
     H, W = x.shape[-2], x.shape[-1]
     x = x.astype(F)
@@ -81,7 +83,8 @@ def spectral_2corner_herm(w, x, m):
     return (u / (H * W)).astype(F)
 
 
-def spectral_2corner_jnpfft(w, x, m):
+def spectral_2corner_jnpfft(w, x, n_modes):
+    m = n_modes // 2        # n_modes counts both corners
     B, C, H, W = x.shape
     Xf = jnp.fft.rfft2(x, axes=(-2, -1))
     Wc = w["w_re"] + 1j * w["w_im"]

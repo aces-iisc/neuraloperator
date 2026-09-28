@@ -109,3 +109,93 @@ def pallas_reduced(xr, K_TILE=128, interpret=True, dt=F):
         compiler_params=_PARALLEL,
         interpret=interpret,
     )(xr)
+
+
+# ── the other engines, same shape: one K_TILE block, whole transform in VMEM ──
+
+def _coupled_kernel(xr_ref, yr_ref, yi_ref, *, dt):
+    from .tricks import rfft_coupled_reim
+    yr_ref[...], yi_ref[...] = rfft_coupled_reim(xr_ref[...], 0.5, dt)
+
+
+def pallas_coupled(xr, K_TILE=128, interpret=True, dt=F):
+    N, K = xr.shape
+    return pl.pallas_call(
+        partial(_coupled_kernel, dt=dt),
+        grid=(K // K_TILE,),
+        in_specs=[pl.BlockSpec((N, K_TILE), lambda k: (0, k))],
+        out_specs=[pl.BlockSpec((N // 2, K_TILE), lambda k: (0, k))] * 2,
+        out_shape=[jax.ShapeDtypeStruct((N // 2, K), dt)] * 2,
+        compiler_params=_PARALLEL,
+        interpret=interpret,
+    )(xr)
+
+
+def _partial_kernel(xr_ref, yr_ref, yi_ref, *, n_modes, dt):
+    from ...fft.rfft1d import rfft_low_modes
+    yr_ref[...], yi_ref[...] = rfft_low_modes(xr_ref[...], n_modes, dt)
+
+
+def pallas_partial(xr, n_modes, K_TILE=128, interpret=True, dt=F):
+    N, K = xr.shape
+    return pl.pallas_call(
+        partial(_partial_kernel, n_modes=n_modes, dt=dt),
+        grid=(K // K_TILE,),
+        in_specs=[pl.BlockSpec((N, K_TILE), lambda k: (0, k))],
+        out_specs=[pl.BlockSpec((n_modes, K_TILE), lambda k: (0, k))] * 2,
+        out_shape=[jax.ShapeDtypeStruct((n_modes, K), dt)] * 2,
+        compiler_params=_PARALLEL,
+        interpret=interpret,
+    )(xr)
+
+
+def _direct_kernel(xr_ref, yr_ref, yi_ref, *, dt):
+    from ...fft.rfft1d import rfft_direct
+    yr_ref[...], yi_ref[...] = rfft_direct(xr_ref[...], True, dt)
+
+
+def pallas_direct(xr, K_TILE=128, interpret=True, dt=F):
+    N, K = xr.shape
+    return pl.pallas_call(
+        partial(_direct_kernel, dt=dt),
+        grid=(K // K_TILE,),
+        in_specs=[pl.BlockSpec((N, K_TILE), lambda k: (0, k))],
+        out_specs=[pl.BlockSpec((N // 2, K_TILE), lambda k: (0, k))] * 2,
+        out_shape=[jax.ShapeDtypeStruct((N // 2, K), dt)] * 2,
+        compiler_params=_PARALLEL,
+        interpret=interpret,
+    )(xr)
+
+
+# ── DFT matrix built once into VMEM scratch, reused across grid steps ────────
+# The kernel body runs once per grid step, and the iota + cos/sin inside it are real Mosaic ops
+# (a stray float iota is what made pallas_partial fail to lower), so the matrix is rebuilt every
+# step. Passing it in from HBM instead was measured 25-42% slower: the DMA costs more than the
+# arithmetic. A VMEM scratch avoids both -- build it on step 0, keep it on chip afterwards.
+# This only pays when the grid has more than one step, i.e. K_TILE < K.
+
+def _partial_cached_kernel(xr_ref, yr_ref, yi_ref, cos_ref, sin_ref, *, n_modes, dt):
+    @pl.when(pl.program_id(0) == 0)
+    def _build():
+        n = xr_ref.shape[0]
+        angle = (-2.0 * jnp.pi / n) * jnp.outer(jnp.arange(n_modes), jnp.arange(n)).astype(F)
+        cos_ref[...] = jnp.cos(angle).astype(dt)
+        sin_ref[...] = jnp.sin(angle).astype(dt)
+
+    x = xr_ref[...]
+    yr_ref[...] = jnp.matmul(cos_ref[...], x, preferred_element_type=jnp.float32)
+    yi_ref[...] = jnp.matmul(sin_ref[...], x, preferred_element_type=jnp.float32)
+
+
+def pallas_partial_cached(xr, n_modes, K_TILE=128, interpret=False, dt=F):
+    """Lowest n_modes bins, with the DFT rows built on grid step 0 and kept in VMEM."""
+    N, K = xr.shape
+    return pl.pallas_call(
+        partial(_partial_cached_kernel, n_modes=n_modes, dt=dt),
+        grid=(K // K_TILE,),
+        in_specs=[pl.BlockSpec((N, K_TILE), lambda k: (0, k))],
+        out_specs=[pl.BlockSpec((n_modes, K_TILE), lambda k: (0, k))] * 2,
+        out_shape=[jax.ShapeDtypeStruct((n_modes, K), dt)] * 2,
+        scratch_shapes=[pltpu.VMEM((n_modes, N), dt)] * 2,
+        interpret=interpret,
+    )(xr)

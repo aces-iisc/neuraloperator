@@ -37,11 +37,15 @@ def _init_mlp(key, in_ch, hidden_ch, out_ch):
 
 
 def _init_spectral_weight(key, in_ch, out_ch, n_modes):
-    """The learned complex filter, as (w_re, w_im) of shape (in, out, 2*n_modes, n_modes):
-    the +/- band on rows, the low modes on cols."""
+    """The learned complex filter, as (w_re, w_im) of shape (in, out, n_modes, n_modes//2).
+
+    `n_modes` is the TOTAL number of wavenumbers kept on an axis, matching the convention in
+    neuralop's SpectralConv: half of them negative and half non-negative. The rows therefore span
+    the full n_modes band, while the columns keep only n_modes//2 because that axis is rfft'd and
+    its negative half is redundant."""
     std = (2.0 / (in_ch + out_ch)) ** 0.5
     k_re, k_im = jax.random.split(key)
-    shape = (in_ch, out_ch, 2 * n_modes, n_modes)
+    shape = (in_ch, out_ch, n_modes, n_modes // 2)
     return {"w_re": std * jax.random.normal(k_re, shape),
             "w_im": std * jax.random.normal(k_im, shape)}
 

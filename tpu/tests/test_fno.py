@@ -17,7 +17,8 @@ from ..fft import core, rfft1d, rfft2d
 from ..fft.core import F
 from ..fno import layers, model, spectral, train
 
-SHAPES = [(32, 32, 8), (64, 64, 12), (17, 16, 6)]
+# (rows, cols, n_modes) -- n_modes is the TOTAL band, so each corner holds half
+SHAPES = [(32, 32, 16), (64, 64, 24), (17, 16, 12)]
 
 
 def _rel(a, b):
@@ -78,25 +79,25 @@ def test_spectral_conv_matches_complex64_reference(n_rows, n_cols, n_modes):
 
 
 def test_forward_matches_reference():
-    P = layers.init_fno(jax.random.PRNGKey(7), 1, 1, channels=8, n_modes=6, n_layers=3)
+    P = layers.init_fno(jax.random.PRNGKey(7), 1, 1, channels=8, n_modes=12, n_layers=3)
     x = jnp.asarray(np.random.default_rng(6).standard_normal((3, 1, 32, 32)), jnp.float32)
-    assert _rel(model.forward(P, x, 6), reference.forward(P, x, 6)) < 2e-3
+    assert _rel(model.forward(P, x, 12), reference.forward(P, x, 12)) < 2e-3
 
 
 def test_save_load_round_trip():
-    P = layers.init_fno(jax.random.PRNGKey(8), 1, 1, channels=8, n_modes=6, n_layers=2)
+    P = layers.init_fno(jax.random.PRNGKey(8), 1, 1, channels=8, n_modes=12, n_layers=2)
     x = jnp.asarray(np.random.default_rng(7).standard_normal((2, 1, 32, 32)), jnp.float32)
     path = os.path.join(tempfile.mkdtemp(), "params.npz")
     model.save_params(P, path)
-    restored = model.load_params(path, channels=8, n_modes=6, n_layers=2)
-    assert _rel(model.forward(restored, x, 6), model.forward(P, x, 6)) == 0.0
+    restored = model.load_params(path, channels=8, n_modes=12, n_layers=2)
+    assert _rel(model.forward(restored, x, 12), model.forward(P, x, 12)) == 0.0
 
 
 def test_training_reduces_error():
     rng = np.random.default_rng(9)
     x = np.asarray(rng.standard_normal((32, 1, 16, 16)), np.float32)
     y = np.asarray(np.tanh(2 * x), np.float32)
-    _, rel, _ = train.train(x, y, x[:8], y[:8], n_modes=4, channels=8, n_layers=2,
+    _, rel, _ = train.train(x, y, x[:8], y[:8], n_modes=8, channels=8, n_layers=2,
                             steps=6, batch=8, log_every=5, verbose=False)
     assert rel < 1.0
 

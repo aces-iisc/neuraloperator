@@ -18,16 +18,20 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from ..fft.core import F
 from .layers import add_grid, channel_mlp, conv1x1, gelu, init_fno, n_params  # noqa: F401
 from .spectral import spectral_conv
 
 
-def forward(P, x, n_modes):
-    """P = the whole weight tree, x = (B, in_ch, H, W) real field -> (B, out_ch, H, W)."""
+def forward(P, x, n_modes, dtype=F):
+    """P = the whole weight tree, x = (B, in_ch, H, W) real field -> (B, out_ch, H, W).
+
+    `dtype` is the precision the spectral path is carried in. F is the f32 default; BF halves the
+    activation bytes through the transform while accumulation stays f32."""
     x = add_grid(x)
     x = channel_mlp(P["lift"], x)
     for block in P["blocks"]:
-        spectral = spectral_conv(block["filter"], x, n_modes)
+        spectral = spectral_conv(block["filter"], x, n_modes, dtype)
         x = gelu(spectral + conv1x1(block["skip"], x))
     return channel_mlp(P["proj"], x)
 
