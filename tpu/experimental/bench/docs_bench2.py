@@ -150,9 +150,13 @@ def main():
     assert str(prec).lower().endswith("highest"), f"expected HIGHEST, got {prec}"
     os.makedirs(LOGDIR, exist_ok=True)
 
-    part1_fft_1d()
-    part3_coupled_low_modes()
-    part2_fno_inference()
+    want = os.environ.get("DOCS_PARTS", "1,2,3").split(",")
+    if "1" in want:
+        part1_fft_1d()
+    if "3" in want:
+        part3_coupled_low_modes()
+    if "2" in want:
+        part2_fno_inference()
 
     keys = sorted({k for r in ROWS for k in r})
     with open("/tmp/docs_bench2.csv", "w", newline="") as fh:
