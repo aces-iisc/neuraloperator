@@ -93,3 +93,16 @@ tpu/traces/
 *.trace.json.gz
 /tpu/results/modes
 /tpu/results/baseline
+
+# TPU benchmark artefacts: trained weights, HLO dumps and xprof captures are
+# reproducible from tpu/repro and far too large to carry in the tree
+tpu/results/**/*.npz
+tpu/results/**/*.pt
+tpu/results/**/*.tar.gz
+tpu/results/h1/h1w/
+tpu/results/baseline/
+tpu/results/models/
+tpu/experimental/hlo_vmem/hlo*/
+tpu/experimental/hlo_vmem/*.tar.gz
+tpu/traces/
+tpu/experimental/hlo_vmem/*.entry.txt
