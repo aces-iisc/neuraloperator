@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from . import data
-from .layers import adam_init, adam_step, init_fno, mse, n_params
+from .layers import LOSSES, adam_init, adam_step, init_fno, mse, n_params
 from .model import forward, save_params
 
 EVAL_CHUNK = 64      # test set is evaluated in chunks so 128^2 does not blow up HBM
@@ -32,11 +32,12 @@ def infer_us_per_sample(P, x, n_modes, fwd=forward, reps=30):
 
 def train(xtr, ytr, xte, yte, n_modes=16, channels=32, n_layers=4, steps=200, batch=16,
           lr=1e-3, weight_decay=1e-4, lr_step=100, lr_gamma=0.5, seed=0, fwd=forward,
+          loss="mse",
           log_every=10, name="fno", log_csv=None, save=None, verbose=True):
     """Adam + MSE with a step LR schedule, keeping the best-on-test parameters (early stopping)
     so a late overfit cannot silently degrade what gets reported or saved.
 
-    Returns (best_params, best_rel_l2, train_seconds).  Training data stays on the host as numpy
+    Returns (best_params, best_test_rel, train_seconds), the error in the TRAINING metric.  Training data stays on the host as numpy
     and is moved to device one batch at a time — the full NS set does not fit otherwise."""
     xtr, ytr = np.asarray(xtr, np.float32), np.asarray(ytr, np.float32)
     xte, yte = np.asarray(xte, np.float32), np.asarray(yte, np.float32)
@@ -48,17 +49,30 @@ def train(xtr, ytr, xte, yte, n_modes=16, channels=32, n_layers=4, steps=200, ba
 
     @jax.jit
     def train_step(P, opt, x, y, lr_now):
-        loss, grads = jax.value_and_grad(lambda P: mse(fwd(P, x, n_modes), y))(P)
+        obj = LOSSES[loss]
+        loss_v, grads = jax.value_and_grad(lambda P: obj(fwd(P, x, n_modes), y))(P)
         P, opt = adam_step(P, grads, opt, lr=lr_now, weight_decay=weight_decay)
-        return P, opt, loss
+        return P, opt, loss_v
 
     @jax.jit
     def eval_chunk(P, x, y):
-        pred = fwd(P, x, n_modes)
-        return (jnp.sum((pred - y) ** 2, (-1, -2, -3)),      # per-sample, so chunks can be summed
-                jnp.sum(y ** 2, (-1, -2, -3)))
+        """Per-sample numerator and denominator of the relative error, in the TRAINING metric.
 
-    def test_rel_l2(P):
+        Evaluating on something other than the objective would early-stop on a criterion the
+        model is not being optimised for, so the H1 derivative terms are included whenever the
+        loss is H1."""
+        pred = fwd(P, x, n_modes)
+        err = jnp.sum((pred - y) ** 2, (-1, -2, -3))
+        norm = jnp.sum(y ** 2, (-1, -2, -3))
+        if loss == "h1":
+            for axis in (-1, -2):
+                d_pred = jnp.diff(pred, axis=axis, append=jnp.take(pred, jnp.array([0]), axis))
+                d_y = jnp.diff(y, axis=axis, append=jnp.take(y, jnp.array([0]), axis))
+                err = err + jnp.sum((d_pred - d_y) ** 2, (-1, -2, -3))
+                norm = norm + jnp.sum(d_y ** 2, (-1, -2, -3))
+        return err, norm
+
+    def test_rel(P):
         err = norm = 0.0
         for i in range(0, xte.shape[0], EVAL_CHUNK):
             e, n = eval_chunk(P, jnp.asarray(xte[i:i + EVAL_CHUNK]), jnp.asarray(yte[i:i + EVAL_CHUNK]))
@@ -71,7 +85,7 @@ def train(xtr, ytr, xte, yte, n_modes=16, channels=32, n_layers=4, steps=200, ba
               f"test | params={n_params(P):,}", flush=True)
 
     best_rel_l2, best_P = float("inf"), P
-    history = [("epoch", "train_mse", "test_rel_l2", "best")]
+    history = [("epoch", "train_mse", "test_rel", "best")]
     n_batches = max(1, n_train // batch)
     t0 = time.perf_counter()
 
@@ -86,13 +100,13 @@ def train(xtr, ytr, xte, yte, n_modes=16, channels=32, n_layers=4, steps=200, ba
             epoch_loss += float(loss)
 
         if epoch % log_every == 0 or epoch == steps - 1:
-            rel = test_rel_l2(P)
+            rel = test_rel(P)
             if rel < best_rel_l2:
                 best_rel_l2, best_P = rel, jax.tree_util.tree_map(lambda a: a, P)
             history.append((epoch, epoch_loss / n_batches, rel, best_rel_l2))
             if verbose:
                 print(f"  epoch {epoch:4d}  train_mse {epoch_loss/n_batches:.4e}  "
-                      f"test_rel_l2 {rel:.4e}  best {best_rel_l2:.4e}", flush=True)
+                      f"test_rel[{loss}] {rel:.4e}  best {best_rel_l2:.4e}", flush=True)
 
     seconds = time.perf_counter() - t0
     if verbose:
@@ -103,7 +117,7 @@ def train(xtr, ytr, xte, yte, n_modes=16, channels=32, n_layers=4, steps=200, ba
     if save:
         save_params(best_P, save)
         if verbose:
-            print(f"saved best (rel_l2 {best_rel_l2:.4e}) -> {save}", flush=True)
+            print(f"saved best (rel[{loss}] {best_rel_l2:.4e}) -> {save}", flush=True)
     return best_P, best_rel_l2, seconds
 
 

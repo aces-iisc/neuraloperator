@@ -54,25 +54,25 @@ def _forward(x, half, row_band, n_rows, n_cols, dtype, stacked):
 
 
 def _mix_naive(w_re, w_im, zr, zi):
-    mix = lambda w, z: _E("ioad,niad->noad", w, z)
+    mix = lambda w, z: _E("adio,niad->noad", w, z)
     return mix(w_re, zr) - mix(w_im, zi), mix(w_re, zi) + mix(w_im, zr)
 
 
 def _mix_block(w_re, w_im, zr, zi):
     """One matmul instead of four: [[Wre,-Wim],[Wim,Wre]] against [Zre;Zim], stacking both the
     contracted channel axis and the output axis, so the MXU sees 2*channels on each side."""
-    top = jnp.concatenate([w_re, -w_im], axis=0)      # (2C, C, a, d) -> real part
-    bot = jnp.concatenate([w_im, w_re], axis=0)       # (2C, C, a, d) -> imag part
-    w = jnp.concatenate([top, bot], axis=1)           # (2C, 2C, a, d)
+    left = jnp.concatenate([w_re, -w_im], axis=2)     # (a, d, 2C, C) -> real part
+    right = jnp.concatenate([w_im, w_re], axis=2)     # (a, d, 2C, C) -> imag part
+    w = jnp.concatenate([left, right], axis=3)        # (a, d, 2C, 2C)
     z = jnp.concatenate([zr, zi], axis=1)             # (n, 2C, a, d)
-    out = _E("ioad,niad->noad", w, z)
-    c = w_re.shape[1]
+    out = _E("adio,niad->noad", w, z)
+    c = w_re.shape[3]
     return out[:, :c], out[:, c:]
 
 
 def _mix_karatsuba(w_re, w_im, zr, zi):
     """Three matmuls instead of four (Gauss/Karatsuba)."""
-    mix = lambda w, z: _E("ioad,niad->noad", w, z)
+    mix = lambda w, z: _E("adio,niad->noad", w, z)
     a = mix(w_re, zr)
     b = mix(w_im, zi)
     c = mix(w_re + w_im, zr + zi)

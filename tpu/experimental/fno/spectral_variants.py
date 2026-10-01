@@ -29,7 +29,7 @@ def spectral_2corner_hybrid(w, x, n_modes):
     Cr1, Ci1 = _rows(jnp.arange(m), W, -1)
     ew = lambda M, Z: _E("dw,ncaw->ncad", M, Z)
     Xr = ew(Cr1, Ar) - ew(Ci1, Ai); Xi = ew(Cr1, Ai) + ew(Ci1, Ar)
-    mix = lambda M, Z: _E("ioad,niad->noad", M, Z)
+    mix = lambda M, Z: _E("adio,niad->noad", M, Z)
 
     Or_ = mix(w["w_re"], Xr) - mix(w["w_im"], Xi); Oi = mix(w["w_re"], Xi) + mix(w["w_im"], Xr)
     d = jnp.arange(m); alpha = jnp.where(d == 0, 1.0, 2.0).astype(F)
@@ -69,7 +69,7 @@ def spectral_2corner_herm(w, x, n_modes):
     ew = lambda M, Z: _E("dw,ncaw->ncad", M, Z)
     Xr = ew(Cr1, Ar) - ew(Ci1, Ai); Xi = ew(Cr1, Ai) + ew(Ci1, Ar)
 
-    mix = lambda M, Z: _E("ioad,niad->noad", M, Z)
+    mix = lambda M, Z: _E("adio,niad->noad", M, Z)
     Or_ = mix(w["w_re"], Xr) - mix(w["w_im"], Xi); Oi = mix(w["w_re"], Xi) + mix(w["w_im"], Xr)
     d = jnp.arange(m); alpha = jnp.where(d == 0, 1.0, 2.0).astype(F)
     IwR, IwI = _rows(d, W, +1)
@@ -88,8 +88,8 @@ def spectral_2corner_jnpfft(w, x, n_modes):
     B, C, H, W = x.shape
     Xf = jnp.fft.rfft2(x, axes=(-2, -1))
     Wc = w["w_re"] + 1j * w["w_im"]
-    out = jnp.zeros((B, w["w_re"].shape[1], H, W // 2 + 1), Xf.dtype)
-    top = jnp.einsum("ioad,niad->noad", Wc[:, :, :m], Xf[..., :m, :m])
-    bot = jnp.einsum("ioad,niad->noad", Wc[:, :, m:], Xf[..., H - m:, :m])
+    out = jnp.zeros((B, w["w_re"].shape[3], H, W // 2 + 1), Xf.dtype)
+    top = jnp.einsum("adio,niad->noad", Wc[:m], Xf[..., :m, :m])
+    bot = jnp.einsum("adio,niad->noad", Wc[m:], Xf[..., H - m:, :m])
     out = out.at[..., :m, :m].set(top).at[..., H - m:, :m].set(bot)
     return jnp.fft.irfft2(out, s=(H, W), axes=(-2, -1))

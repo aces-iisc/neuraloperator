@@ -15,12 +15,12 @@ def spectral_conv(w, x, n_modes):
     half = n_modes // 2        # n_modes counts both corners
     B, C, H, W = x.shape
     x_ft = jnp.fft.rfft2(x, axes=(-2, -1))                      # (B, C, H, W//2+1) complex64
-    weight = w["w_re"] + 1j * w["w_im"]                          # (Cin, Cout, 2m, m) complex
-    out = jnp.zeros((B, w["w_re"].shape[1], H, W // 2 + 1), x_ft.dtype)
+    weight = w["w_re"] + 1j * w["w_im"]                          # (2m, m, Cin, Cout) complex   # a = row mode, d = col mode
+    out = jnp.zeros((B, w["w_re"].shape[3], H, W // 2 + 1), x_ft.dtype)
 
-    mix = lambda Wm, Xm: jnp.einsum("ioab,niab->noab", Wm, Xm)   # complex gemm, contract Cin -> Cout
-    top = mix(weight[:, :, :half], x_ft[:, :, :half, :half])              # +corner rows [0:m]
-    bot = mix(weight[:, :, half:], x_ft[:, :, H - half:, :half])          # -corner rows [H-m:]
+    mix = lambda Wm, Xm: jnp.einsum("adio,niad->noad", Wm, Xm)   # complex gemm, contract Cin -> Cout
+    top = mix(weight[:half], x_ft[:, :, :half, :half])                    # +corner rows [0:m]
+    bot = mix(weight[half:], x_ft[:, :, H - half:, :half])                # -corner rows [H-m:]
     out = out.at[:, :, :half, :half].set(top).at[:, :, H - half:, :half].set(bot)
 
     return jnp.fft.irfft2(out, s=(H, W), axes=(-2, -1))          # back to a real field

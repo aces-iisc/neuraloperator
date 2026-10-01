@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 
 from ..fft.core import ACC, F
+from .layers import spectral_block
 
 # einsum letters: n=sample c/i=in-channel o=out-channel h=row w=col
 #                 a=row mode (the 2m band)  d=col mode (the low m)
@@ -28,13 +29,15 @@ def spectral_conv(weight, x, n_modes, dtype=F):
     Steps 1-2 compute ONLY the modes that survive truncation, so no full FFT ever happens, and
     step 4 reconstructs the full field straight from them — the un-kept modes are implicitly zero,
     with no padding tensor.  `n_modes` is the TOTAL band width, so each corner holds n_modes//2.
-    `weight` is {w_re, w_im} of shape (in_ch, out_ch, n_modes, n_modes//2).
+    `weight` is {w_re, w_im} of shape (n_modes, n_modes//2, in_ch, out_ch), or a
+    prebuilt {w_block} from layers.prebuild_blocks.
     `dtype` is the operand precision the transform is carried in: F is the f32 default, BF halves
     the activation bytes on a memory-bound kernel.  Accumulation stays f32 either way.
     x (B, in_ch, H, W) real -> (B, out_ch, H, W) real."""
     n_rows, n_cols = x.shape[-2], x.shape[-1]
     half = n_modes // 2          # n_modes counts BOTH corners; each corner holds half of them
-    n_ch = weight["w_re"].shape[1]
+    n_ch = (weight["w_block"].shape[3] // 2 if "w_block" in weight
+            else weight["w_re"].shape[3])      # (a, d, in, out): out is the minor axis
     x = x.astype(dtype)
 
     # 1. rows -> both low-frequency corners, n_modes wavenumbers in total.
@@ -58,11 +61,13 @@ def spectral_conv(weight, x, n_modes, dtype=F):
     # 3. learned complex channel mix, per kept mode, as ONE real block matmul:
     #    [[w_re, -w_im], [w_im, w_re]] against [modes_re; modes_im].  Same arithmetic as the
     #    four separate products, but one call and twice the contracted channels on the MXU.
-    w_re, w_im = weight["w_re"].astype(dtype), weight["w_im"].astype(dtype)
-    w_block = jnp.concatenate([jnp.concatenate([w_re, -w_im], axis=0),
-                               jnp.concatenate([w_im, w_re], axis=0)], axis=1)
+    w_block = weight.get("w_block")
+    if w_block is None:                       # not prebuilt: fall back to building it here
+        w_block = spectral_block(weight["w_re"], weight["w_im"], dtype)
+    elif w_block.dtype != dtype:
+        w_block = w_block.astype(dtype)
     z_block = jnp.concatenate([modes_re.astype(dtype), modes_im.astype(dtype)], axis=1)
-    mixed = _E("ioad,niad->noad", w_block, z_block)
+    mixed = _E("adio,niad->noad", w_block, z_block)
     mixed_re, mixed_im = mixed[:, :n_ch], mixed[:, n_ch:]
 
     # 4a. cols back, folding in the Hermitian partners the rfft'd axis left out

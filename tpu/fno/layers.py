@@ -45,9 +45,32 @@ def _init_spectral_weight(key, in_ch, out_ch, n_modes):
     its negative half is redundant."""
     std = (2.0 / (in_ch + out_ch)) ** 0.5
     k_re, k_im = jax.random.split(key)
-    shape = (in_ch, out_ch, n_modes, n_modes // 2)
+    shape = (n_modes, n_modes // 2, in_ch, out_ch)
     return {"w_re": std * jax.random.normal(k_re, shape),
             "w_im": std * jax.random.normal(k_im, shape)}
+
+
+def spectral_block(w_re, w_im, dtype=None):
+    """The 2x2 real block form of the complex filter, [[re, -im], [im, re]].
+
+    Channels are the two MINOR axes, so the natural row-major layout is already the one the
+    matmul contracts over and no relayout copy is emitted."""
+    wr = w_re if dtype is None else w_re.astype(dtype)
+    wi = w_im if dtype is None else w_im.astype(dtype)
+    return jnp.concatenate([jnp.concatenate([wr, -wi], axis=2),
+                            jnp.concatenate([wi, wr], axis=2)], axis=3)
+
+
+def prebuild_blocks(P, dtype=None):
+    """Return a copy of the weight tree with each filter's block matrix built once.
+
+    Passing the block in as an argument keeps it off the per-call path; rebuilding it inside
+    the kernel materialises 8*C^2*NM^2 bytes on every call."""
+    out = dict(P)
+    out["blocks"] = [dict(b, filter=dict(b["filter"],
+                     w_block=spectral_block(b["filter"]["w_re"], b["filter"]["w_im"], dtype)))
+                     for b in P["blocks"]]
+    return out
 
 
 def init_fno(key, in_ch=1, out_ch=1, channels=32, n_modes=16, n_layers=4):
@@ -73,6 +96,41 @@ def rel_l2(pred, y):
     err = jnp.sqrt(jnp.sum((pred - y) ** 2, axis=(-1, -2, -3)))
     norm = jnp.sqrt(jnp.sum(y ** 2, axis=(-1, -2, -3)))
     return jnp.mean(err / norm)
+
+
+def lp_rel(pred, y, d=2):
+    """neuralop's LpLoss(d=2, p=2): relative L2 per sample, summed over the batch."""
+    flat = lambda a: a.reshape(a.shape[:-d] + (-1,))
+    pf, yf = flat(pred), flat(y)
+    num = jnp.sqrt(jnp.sum((pf - yf) ** 2, axis=-1))
+    den = jnp.sqrt(jnp.sum(yf ** 2, axis=-1))
+    return jnp.sum(num / den)
+
+
+def h1_rel(pred, y, d=2):
+    """neuralop's H1Loss(d=2): value and first derivatives, relative, summed over the batch.
+
+    Derivatives are periodic central differences with spacing 1/N per axis, and the reduction
+    is a sum over the batch rather than a mean -- both verified against the torch implementation."""
+    flat = lambda a: a.reshape(a.shape[:-d] + (-1,))
+    axes = [-2, -1]
+    steps = [1.0 / pred.shape[a] for a in axes]
+
+    def terms(a):
+        out = [a]
+        for ax, h in zip(axes, steps):
+            out.append((jnp.roll(a, -1, ax) - jnp.roll(a, 1, ax)) / (2.0 * h))
+        return out
+
+    diff = 0.0
+    norm = 0.0
+    for tp, ty in zip(terms(pred), terms(y)):
+        diff = diff + jnp.sum((flat(tp) - flat(ty)) ** 2, axis=-1)
+        norm = norm + jnp.sum(flat(ty) ** 2, axis=-1)
+    return jnp.sum(jnp.sqrt(diff) / jnp.sqrt(norm))
+
+
+LOSSES = {"mse": mse, "l2": lp_rel, "h1": h1_rel}
 
 
 def adam_init(P):

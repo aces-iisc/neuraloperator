@@ -23,15 +23,17 @@ from .layers import add_grid, channel_mlp, conv1x1, gelu, init_fno, n_params  # 
 from .spectral import spectral_conv
 
 
-def forward(P, x, n_modes, dtype=F):
+def forward(P, x, n_modes, dtype=F, conv=spectral_conv):
     """P = the whole weight tree, x = (B, in_ch, H, W) real field -> (B, out_ch, H, W).
 
     `dtype` is the precision the spectral path is carried in. F is the f32 default; BF halves the
-    activation bytes through the transform while accumulation stays f32."""
+    activation bytes through the transform while accumulation stays f32.
+    `conv` swaps the spectral convolution for a variant with the rest of the graph held fixed,
+    which is how one optimisation at a time gets isolated; it defaults to the shipped one."""
     x = add_grid(x)
     x = channel_mlp(P["lift"], x)
     for block in P["blocks"]:
-        spectral = spectral_conv(block["filter"], x, n_modes, dtype)
+        spectral = conv(block["filter"], x, n_modes, dtype)
         x = gelu(spectral + conv1x1(block["skip"], x))
     return channel_mlp(P["proj"], x)
 
@@ -46,5 +48,13 @@ def load_params(path, channels, n_modes, n_layers=4, in_ch=1, out_ch=1, seed=0):
     saved = np.load(path)
     leaves = [jnp.asarray(saved[f"arr_{i}"]) for i in range(len(saved.files))]
     skeleton = init_fno(jax.random.PRNGKey(seed), in_ch, out_ch, channels, n_modes, n_layers)
-    _, treedef = jax.tree_util.tree_flatten(skeleton)
-    return jax.tree_util.tree_unflatten(treedef, leaves)
+    want, treedef = jax.tree_util.tree_flatten(skeleton)
+
+    # Checkpoints written before the filter moved its channels to the minor axes hold
+    # (in, out, modes, modes/2); bring them forward rather than refusing to load.
+    fixed = []
+    for leaf, ref in zip(leaves, want):
+        if leaf.shape != ref.shape and leaf.ndim == 4 and leaf.transpose(2, 3, 0, 1).shape == ref.shape:
+            leaf = leaf.transpose(2, 3, 0, 1)
+        fixed.append(leaf)
+    return jax.tree_util.tree_unflatten(treedef, fixed)

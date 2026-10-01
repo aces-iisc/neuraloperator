@@ -16,7 +16,13 @@ CDTYPE = jnp.complex64     # only for the complex reference FFTs in experimental
 BYTES_PER_COMPONENT = {F: 4, BF: 2, I8: 1}   # f32->complex64, bf16->"complex32", int8->"complex16"
 
 # A radix stage contracts over a whole 3-D block; the leaf is a plain 2-D matmul.
+CBK_MIN_COLS = 64          # fold the stage transpose into the matmul only above this width
+
+# Two spellings of one radix stage. 'cbk' makes the permutation the matmul's write pattern, so
+# the transposed copy is never materialised. It pays only on wide stages; the threshold is
+# empirically tested, and wall clock cannot resolve it -- it needs device time.
 stage_matmul = lambda mat, x: jnp.einsum('br,rck->bck', mat, x, preferred_element_type=ACC)
+stage_matmul_t = lambda mat, x: jnp.einsum('br,rck->cbk', mat, x, preferred_element_type=ACC)
 leaf_matmul = lambda mat, x: jnp.matmul(mat, x, preferred_element_type=ACC)
 
 
@@ -46,8 +52,10 @@ def complex_matmul(matmul, cos, sin, cos_plus_sin, x_re, x_im):
 
 def _twiddle(stage_len, n_cols):
     """Twiddle factors W_stage_len^(row*col) for a stage, as (cos, sin) broadcastable over batch."""
-    rows = jnp.arange(RADIX)[:, None]
-    cols = jnp.arange(n_cols)[None, :]
+    if n_cols >= CBK_MIN_COLS:                       # (cols, radix) for the cbk stage output
+        rows, cols = jnp.arange(RADIX)[None, :], jnp.arange(n_cols)[:, None]
+    else:                                            # (radix, cols) for the bck one
+        rows, cols = jnp.arange(RADIX)[:, None], jnp.arange(n_cols)[None, :]
     angle = (-2 * jnp.pi * rows * cols / stage_len).astype(F)
     return jnp.cos(angle)[:, :, None], jnp.sin(angle)[:, :, None]
 
@@ -79,16 +87,20 @@ def rfft_staged(signal, n, half=True, dtype=F):
 
         if input_is_real:
             block = cur_re.reshape(RADIX, n_cols, batch)
-            stage_re, stage_im = stage_matmul(cos, block), stage_matmul(sin, block)
+            mm = stage_matmul_t if n_cols >= CBK_MIN_COLS else stage_matmul
+            stage_re, stage_im = mm(cos, block), mm(sin, block)
             input_is_real = False
         else:
             stage_re, stage_im = complex_matmul(
-                stage_matmul, cos, sin, cos_plus_sin,
+                stage_matmul_t if n_cols >= CBK_MIN_COLS else stage_matmul,
+                cos, sin, cos_plus_sin,
                 cur_re.reshape(RADIX, n_cols, batch), cur_im.reshape(RADIX, n_cols, batch))
 
         tw_cos, tw_sin = _twiddle(length, n_cols)        # f32 twiddle applied to f32 accumulators
-        cur_re = (stage_re * tw_cos - stage_im * tw_sin).transpose(1, 0, 2)
-        cur_im = (stage_re * tw_sin + stage_im * tw_cos).transpose(1, 0, 2)
+        cur_re = stage_re * tw_cos - stage_im * tw_sin
+        cur_im = stage_re * tw_sin + stage_im * tw_cos
+        if n_cols < CBK_MIN_COLS:                    # narrow stage: transpose explicitly
+            cur_re, cur_im = cur_re.transpose(1, 0, 2), cur_im.transpose(1, 0, 2)
         cur_re = cur_re.reshape(n_cols, RADIX * batch).astype(dtype)   # store back in `dtype`
         cur_im = cur_im.reshape(n_cols, RADIX * batch).astype(dtype)
 
@@ -117,12 +129,16 @@ def fft_staged_complex(x_re, x_im, n):
         n_cols = length // RADIX
         cos, sin, cos_plus_sin = dft_matrix_reim(RADIX)
         stage_re, stage_im = complex_matmul(
-            stage_matmul, cos, sin, cos_plus_sin,
+            stage_matmul_t if n_cols >= CBK_MIN_COLS else stage_matmul,
+            cos, sin, cos_plus_sin,
             cur_re.reshape(RADIX, n_cols, batch), cur_im.reshape(RADIX, n_cols, batch))
 
         tw_cos, tw_sin = _twiddle(length, n_cols)
-        cur_re = (stage_re * tw_cos - stage_im * tw_sin).transpose(1, 0, 2).reshape(n_cols, RADIX * batch)
-        cur_im = (stage_re * tw_sin + stage_im * tw_cos).transpose(1, 0, 2).reshape(n_cols, RADIX * batch)
+        nr, ni = stage_re * tw_cos - stage_im * tw_sin, stage_re * tw_sin + stage_im * tw_cos
+        if n_cols < CBK_MIN_COLS:
+            nr, ni = nr.transpose(1, 0, 2), ni.transpose(1, 0, 2)
+        cur_re = nr.reshape(n_cols, RADIX * batch)
+        cur_im = ni.reshape(n_cols, RADIX * batch)
 
         stages.append(RADIX)
         length, batch = n_cols, RADIX * batch

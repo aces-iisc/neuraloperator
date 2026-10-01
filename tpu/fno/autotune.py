@@ -74,3 +74,28 @@ def neighbours_add(value, step=8, n=2, lo=None, hi=None):
         if v not in out:
             out.append(v)
     return sorted(out)
+
+
+# The transform method, settled by measurement rather than searched.  Sweeping all three over
+# n_modes x N (both powers of two, n_modes <= N <= 4096, each cell at its own best batch), the
+# banded reim DFT wins 53 of 60 cells.  The seven it loses are all within 1.02x and sit at the
+# extremes -- either n_modes = 4, where the row pass is too small to matter and the three methods
+# tie, or the full spectrum.  There is one real crossover, at n_modes = N = 1024, where the
+# even/odd reduction is 1.4% faster on device time because its matrix is half the height; an FNO
+# never runs there, since the band is what makes the layer cheap in the first place.
+#
+# The reduction is also a liability at the shapes that matter: at grid 128 its recombination
+# gathers lower to a while loop, and it measures 12,156 us against reim's 349 with an identical
+# 272 us of matmul.  All three agree to float32 roundoff, so the ordering is speed alone.
+# See tpu/results/modesweep/ and tpu/results/rerun/.
+METHODS = ("reim", "coupled", "reduced")
+
+
+def predict_method(n_grid=None, n_modes=None):
+    """Which transform to run.
+
+    Constant: the only measured crossover is at n_modes = N, which is outside the regime an FNO
+    operates in.  The alternatives stay in METHODS because the sweep is cheap insurance if the
+    band ever grows towards the grid.
+    """
+    return "reim"

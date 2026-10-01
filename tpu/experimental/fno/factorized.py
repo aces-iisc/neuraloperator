@@ -174,7 +174,7 @@ def quick_train(fwd, P, xtr, ytr, xte, yte, steps=60, batch=32, lr=5e-3):
     @jax.jit
     def step(P, opt, x, y):
         loss, g = jax.value_and_grad(lambda P: mse(fwd(P, x), y))(P)
-        P, opt = _adam_step(P, g, opt, lr=lr, wd=1e-4)
+        P, opt = _adam_step(P, g, opt, lr=lr, weight_decay=1e-4)
         return P, opt, loss
     key = jax.random.PRNGKey(0)
     nb = max(1, xtr.shape[0] // batch)
@@ -217,7 +217,7 @@ def train_incremental(P, xtr, ytr, xte, yte, m, steps=60, batch=32, lr=5e-3, m0=
     @jax.jit
     def step(P, opt, x, y, ma):
         loss, g = jax.value_and_grad(lambda P: mse(forward_incr(P, x, dense_filter, m, ma), y))(P)
-        P, opt = _adam_step(P, g, opt, lr=lr, wd=1e-4)
+        P, opt = _adam_step(P, g, opt, lr=lr, weight_decay=1e-4)
         return P, opt, loss
     key = jax.random.PRNGKey(0)
     nb = max(1, xtr.shape[0] // batch)
