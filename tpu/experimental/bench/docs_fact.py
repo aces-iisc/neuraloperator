@@ -91,11 +91,11 @@ def main():
     print("baseline transform = jnp.fft.rfft2 / irfft2, complex64\n", flush=True)
     os.makedirs(LOGDIR, exist_ok=True)
     rows = []
-    # two engines: the plain jnp.fft path a published FNO uses, and ours with every
-    # transform optimisation in place.  The filter variants are identical in both.
+    # two engines: the plain jnp.fft path a published FNO uses, and ours with every transform
+    # and filter optimisation in place.  The filter variants are identical in both, so a
+    # difference between variants is the factorisation and a difference between engines is us.
     engines = [("baseline", lambda P_, z, f, m: forward_jnp_filter(P_, z, f, m), False),
-               ("ours-xform", lambda P_, z, f, m: fz.forward(P_, z, f, m), False),
-               ("ours-full", lambda P_, z, f, m: fz.forward(P_, z, f, m), True)]
+               ("ours", lambda P_, z, f, m: fz.forward(P_, z, f, m), True)]
     print(f"  {'engine':<10}{'case':<10}{'variant':<8}{'params':>11}"
           f"{'us/sample':>12}{'rel L2':>12}", flush=True)
     for label, loader, channels, modes, batch in CASES:

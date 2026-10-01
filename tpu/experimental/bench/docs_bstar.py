@@ -7,7 +7,9 @@ from ...fno import data, model
 
 LOGDIR = os.environ.get("DOCS_PROF_DIR", "/tmp/docs_prof_bstar")
 CSV = os.environ.get("DOCS_BSTAR_CSV", "/tmp/docs_bstar.csv")
-WEIGHTS = os.environ.get("DOCS_WEIGHTS", os.path.expanduser("~/nop/tpu/results/baseline"))
+WEIGHTS = os.environ.get("DOCS_WEIGHTS",
+                         os.path.expanduser(os.environ.get("REPRO_WEIGHTS",
+                                                           "~/repro_out/weights")))
 ROOT = os.path.expanduser(os.environ.get("DOCS_DATA", "~/data"))
 FIELDS = ["case", "batch", "kind", "dev_ms_total", "us_per_sample", "rel_l2", "n_eval",
           "two_c", "b_star_predicted", "status", "trace"]

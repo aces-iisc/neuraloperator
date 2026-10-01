@@ -1,8 +1,18 @@
 """tab:ladder -- every optimisation in Section 5, each measured against the one before it.
 
-The point of the chain is attribution.  Quoting every step against the baseline makes a step
-that bought nothing look like it bought whatever the steps before it did, so each row here
-reports `gain_prev`, what that step itself was worth, alongside the running `gain_base`.
+Three kinds of change, kept apart because they are not comparable:
+
+  structural   exact rewrites of the same arithmetic -- these chain, and each row reports what
+               that step alone was worth
+  precision    f32 against bf16, the same algorithm at half the activation width.  It is a
+               column rather than a rung: it applies to every structural stage independently
+               and it is not exact, so folding it into the chain would hide which rows are
+               output-preserving
+  model        a different parameterisation (F-FNO), with its own weights and its own accuracy
+
+The chain exists for attribution.  Quoting every step against the baseline makes a step that
+bought nothing look like it bought whatever the steps before it did, so each row carries
+`gain_prev`, what that step itself was worth, next to the running `gain_base`.
 
 The ladder is cumulative: each stage keeps everything above it and adds one thing.
 """
@@ -12,76 +22,148 @@ import numpy as np
 
 from ..fft.core import BF, F
 from ..fno import layers, model
+from ..fno.spectral import separable_conv
 from ..experimental.fno import reference
 from ..experimental.fno.gemm_variants import spectral_conv_variant
-from . import common
-
-TABLE = "tab:ladder"
-FIELDS = ["case", "stage", "dtype", "batch", "params", "us_per_sample", "h1",
-          "gain_prev", "gain_base", "status"]
-
-# (stage label, what it adds).  Order matters: the chain reads top to bottom.
-STAGES = ["baseline jnp.fft", "+partial DFT", "+stacking", "+blocking",
-          "+ADIO layout", "+hoisted block", "+bf16", "+B*"]
+from .common import CASES, Bench, Timing
 
 
-def _conv(mix, stacked):
-    """A spectral conv with one knob set, so a stage can be isolated."""
-    return lambda w, x, m, dt=F: spectral_conv_variant(w, x, m, mix=mix, stacked=stacked, dtype=dt)
+class Ladder(Bench):
+    TABLE = "tab:ladder"
+    FIELDS = (["case", "stage", "kind", "loss", "dtype", "batch", "params", "param_ratio"]
+              + Timing.FIELDS
+              + ["error", "h1", "l2", "gain_prev", "gain_base", "status"])
+
+    @staticmethod
+    def _variant(mix, stacked):
+        """A spectral conv with one knob set, so a single stage can be isolated."""
+        return lambda w, x, m, dt=F: spectral_conv_variant(w, x, m, mix=mix, stacked=stacked,
+                                                           dtype=dt)
+
+    def _plan(self, params):
+        """(stage, params, spectral conv, dtype).  None means the shipped conv."""
+        return [
+            ("baseline jnp.fft", params, "reference", F),
+            ("+partial DFT", params, self._variant("naive", False), F),
+            ("+stacking", params, self._variant("naive", True), F),
+            ("+blocking", params, self._variant("block", True), F),
+            ("+ADIO layout", params, None, F),
+            ("+hoisted block", layers.prebuild_blocks(params, F), None, F),
+        ]
+
+    # Everything in _plan preserves the output exactly, so those stages chain.  F-FNO does not:
+    # it is a different parameterisation with its own weights and its own accuracy, so it is
+    # measured against the dense model at the SAME precision rather than folded into the chain.
+    def _model_choices(self):
+        return [("F-FNO", separable_conv, "+hoisted block")]
+
+    def measure(self):
+        rows = []
+        for case in CASES:
+            loaded = case.load()
+            if loaded is None:
+                continue
+            params = case.weights()
+            ffno_params = case.weights("ffno")
+            if params is None:
+                print(f"  {case.label}: no trained weights yet, skipping", flush=True)
+                continue
+            _, _, x_test, y_test = loaded
+            x = jnp.asarray(np.asarray(x_test[:case.batch], np.float32))
+            y = np.asarray(y_test[:case.batch], np.float32)
+            print(f"  {case.label}: C={case.channels} m={case.n_modes} B={case.batch}",
+                  flush=True)
+
+            case_rows = []
+            dense_params = layers.n_params(params)
+            for stage, tree, conv, dtype in self._plan(params):
+              for prec_name, prec in (("f32", F), ("bf16", BF)):
+                tree_p = (layers.prebuild_blocks(params, prec)
+                          if stage == "+hoisted block" else tree)
+                row = {"case": case.label, "stage": stage, "kind": "structural",
+                       "loss": case.loss, "dtype": prec_name, "batch": case.batch,
+                       "params": layers.n_params(tree_p), "param_ratio": 1.0}
+                try:
+                    fn = self._compile(tree_p, conv, prec, case.n_modes)
+                    timing = self.time(
+                        fn, (x,), f"ladder_{case.label}_{stage}_{prec_name}".replace(" ", "_"),
+                        per=case.batch)
+                    row.update(timing.as_row())
+                    both = self.errors(fn(x), y)
+                    row.update(both)
+                    row["error"] = both[case.loss]       # the metric it was trained for
+                    row["status"] = "ok"
+                    print(f"    {stage:<18}{prec_name:<6}{timing}  "
+                          f"{case.loss} {row['error']:.4e}", flush=True)
+                except Exception as exc:
+                    row["status"] = "OOM" if "RESOURCE" in str(exc).upper() else type(exc).__name__
+                    row.update({"error": float("nan"), "h1": float("nan"),
+                                "l2": float("nan")})
+                    row.update({k: float("nan") for k in Timing.FIELDS})
+                    print(f"    {stage:<18}{prec_name:<6}{row['status']:>12}  "
+                          f"{str(exc)[:50]}", flush=True)
+                case_rows.append(row)
+            # chain within each precision: a stage is compared to the same stage one rung down,
+            # at the same width, never across widths
+            for prec_name in ("f32", "bf16"):
+                self.chain([r for r in case_rows if r["dtype"] == prec_name])
+            rows.extend(case_rows)
+
+            # the model choice, at each precision, against the dense row it replaces
+            if ffno_params is None:
+                print("    F-FNO           no trained weights, skipping", flush=True)
+                continue
+            by_stage = {(r["stage"], r["dtype"]): r for r in case_rows}
+            for stage, conv, against in self._model_choices():
+              for prec_name, dtype in (("f32", F), ("bf16", BF)):
+                row = {"case": case.label, "stage": stage, "kind": "model",
+                       "loss": case.loss, "dtype": prec_name, "batch": case.batch,
+                       "params": layers.n_params(ffno_params),
+                       "param_ratio": dense_params / max(1, layers.n_params(ffno_params))}
+                try:
+                    fn = self._compile(ffno_params, conv, dtype, case.n_modes)
+                    timing = self.time(
+                        fn, (x,), f"ladder_{case.label}_{stage}_{prec_name}".replace(" ", "_"),
+                        per=case.batch)
+                    row.update(timing.as_row())
+                    both = self.errors(fn(x), y)
+                    row.update(both)
+                    row["error"] = both[case.loss]
+                    row["status"] = "ok"
+                    peer = by_stage.get((against, prec_name), {})
+                    base = peer.get("us_mean")
+                    row["gain_prev"] = (base / timing.mean) if base else float("nan")
+                    first = next((r["us_mean"] for r in case_rows
+                                  if r["dtype"] == prec_name and r.get("us_mean")), None)
+                    row["gain_base"] = (first / timing.mean) if first else float("nan")
+                    print(f"    {stage:<18}{prec_name:<6}{timing}  "
+                          f"{case.loss} {row['error']:.4e}  "
+                          f"{row['param_ratio']:.1f}x fewer params  "
+                          f"({row['gain_prev']:.3f}x vs dense)", flush=True)
+                except Exception as exc:
+                    row["status"] = "OOM" if "RESOURCE" in str(exc).upper() else type(exc).__name__
+                    row.update({k: float("nan") for k in Timing.FIELDS})
+                    row.update({"error": float("nan"), "h1": float("nan"), "l2": float("nan"),
+                                "gain_prev": float("nan"), "gain_base": float("nan")})
+                    print(f"    {stage:<18}{prec_name:<6}{row['status']:>12}  "
+                          f"{str(exc)[:50]}", flush=True)
+                rows.append(row)
+        return rows
+
+    @staticmethod
+    def _compile(tree, conv, dtype, n_modes):
+        if conv == "reference":
+            return jax.jit(lambda z: reference.forward(tree, z, n_modes))
+        if conv is None:
+            return jax.jit(lambda z: model.forward(tree, z, n_modes, dtype))
+        return jax.jit(lambda z: model.forward(tree, z, n_modes, dtype, conv=conv))
+
+
+TABLE = Ladder.TABLE
 
 
 def run():
-    print(f"\n### {TABLE}: incremental ladder, each step against the previous", flush=True)
-    rows = []
-    for label, _, channels, n_modes, batch in common.CASES:
-        loaded = common.load_case(label)
-        if loaded is None:
-            continue
-        _, _, x_test, y_test = loaded
-        if not common.have_weights(label):
-            print(f"  {label}: no trained weights, skipping", flush=True)
-            continue
-        P = common.load_weights(label)
-        x = jnp.asarray(np.asarray(x_test[:batch], np.float32))
-        y = np.asarray(y_test[:batch], np.float32)
-        print(f"  {label}: C={channels} n_modes={n_modes} batch={batch}", flush=True)
-
-        # each entry: (stage, params-tree, spectral conv, dtype, batch)
-        plan = [
-            ("baseline jnp.fft", P, None, F, batch),
-            ("+partial DFT", P, _conv("naive", False), F, batch),
-            ("+stacking", P, _conv("naive", True), F, batch),
-            ("+blocking", P, _conv("block", True), F, batch),
-            ("+ADIO layout", P, None, F, batch),            # shipped conv already stores ADIO
-            ("+hoisted block", layers.prebuild_blocks(P, F), None, F, batch),
-            ("+bf16", layers.prebuild_blocks(P, BF), None, BF, batch),
-        ]
-        case_rows = []
-        for stage, params, conv, dt, bsz in plan:
-            try:
-                if stage == "baseline jnp.fft":
-                    fn = jax.jit(lambda z, _p=params: reference.forward(_p, z, n_modes))
-                elif conv is None:
-                    fn = jax.jit(lambda z, _p=params, _d=dt: model.forward(_p, z, n_modes, _d))
-                else:
-                    fn = jax.jit(lambda z, _p=params, _c=conv, _d=dt:
-                                 model.forward(_p, z, n_modes, _d, conv=_c))
-                us = common.timed(fn, (x,), f"ladder_{label}_{stage}".replace(" ", "_")) / bsz
-                err = common.h1(fn(x), y)
-                case_rows.append({"case": label, "stage": stage, "dtype": str(dt.__name__),
-                                  "batch": bsz, "params": layers.n_params(params),
-                                  "us_per_sample": us, "h1": err, "status": "ok"})
-                print(f"    {stage:<18}{us:>10.2f} us   H1 {err:.4e}", flush=True)
-            except Exception as exc:
-                why = "OOM" if "RESOURCE" in str(exc).upper() else type(exc).__name__
-                case_rows.append({"case": label, "stage": stage, "dtype": str(dt.__name__),
-                                  "batch": bsz, "params": 0, "us_per_sample": float("nan"),
-                                  "h1": float("nan"), "status": why})
-                print(f"    {stage:<18}{why:>10}  {str(exc)[:60]}", flush=True)
-        common.chain(case_rows)
-        rows.extend(case_rows)
-    common.write(rows, "tab_ladder", FIELDS)
-    return rows
+    return Ladder().run()
 
 
 if __name__ == "__main__":

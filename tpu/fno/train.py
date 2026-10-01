@@ -32,7 +32,7 @@ def infer_us_per_sample(P, x, n_modes, fwd=forward, reps=30):
 
 def train(xtr, ytr, xte, yte, n_modes=16, channels=32, n_layers=4, steps=200, batch=16,
           lr=1e-3, weight_decay=1e-4, lr_step=100, lr_gamma=0.5, seed=0, fwd=forward,
-          loss="mse",
+          loss="mse", init=None,
           log_every=10, name="fno", log_csv=None, save=None, verbose=True):
     """Adam + MSE with a step LR schedule, keeping the best-on-test parameters (early stopping)
     so a late overfit cannot silently degrade what gets reported or saved.
@@ -44,7 +44,8 @@ def train(xtr, ytr, xte, yte, n_modes=16, channels=32, n_layers=4, steps=200, ba
     n_train = xtr.shape[0]
 
     key = jax.random.PRNGKey(seed)
-    P = init_fno(key, 1, 1, channels, n_modes, n_layers)
+    build = init or init_fno          # a variant filter needs its own weights
+    P = build(key, 1, 1, channels, n_modes, n_layers)
     opt = adam_init(P)
 
     @jax.jit

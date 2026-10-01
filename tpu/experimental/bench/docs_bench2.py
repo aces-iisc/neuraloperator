@@ -159,7 +159,7 @@ def main():
         part2_fno_inference()
 
     keys = sorted({k for r in ROWS for k in r})
-    with open("/tmp/docs_bench2.csv", "w", newline="") as fh:
+    with open(os.environ.get("DOCS_B2_CSV", "/tmp/docs_bench2.csv"), "w", newline="") as fh:
         wr = csv.DictWriter(fh, fieldnames=keys)
         wr.writeheader()
         wr.writerows(ROWS)

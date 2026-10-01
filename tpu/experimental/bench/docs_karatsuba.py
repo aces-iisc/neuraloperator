@@ -130,7 +130,7 @@ def main():
             rows.append({"level": "fft", "n": n, "k": 256, "variant": name, "wall_us": wall,
                          "gflop": fl / 1e9, "hbm_mb": hbm / 1e6, "rel_diff": err})
 
-    with open("/tmp/docs_karatsuba.csv", "w", newline="") as fh:
+    with open(os.environ.get("DOCS_KAR_CSV", "/tmp/docs_karatsuba.csv"), "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=sorted({k for r in rows for k in r}))
         w.writeheader(); w.writerows(rows)
     print("\nKARATSUBA_DONE", flush=True)

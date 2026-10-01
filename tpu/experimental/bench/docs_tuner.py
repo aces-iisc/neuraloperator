@@ -5,7 +5,17 @@ import jax, jax.numpy as jnp, numpy as np
 
 from ...fft.core import BF, F
 from ...fno import layers, model
-from ...fno.autotune import neighbours_add, neighbours_mul, predict_batch
+from ...arch import TPU_V5E, ModelSpec
+from ...fno.autotune import AutoTune
+
+neighbours_add = AutoTune.neighbours_add
+neighbours_mul = AutoTune.neighbours_mul
+
+
+def predict_batch(channels, n_rows, n_cols, dtype="float32"):
+    """The batch the rules start from, for the shape this bench is sweeping."""
+    spec = ModelSpec(grid=max(n_rows, n_cols), channels=channels, n_modes=16)
+    return AutoTune(TPU_V5E, spec).batch(dtype)[0]
 from ...fno.spectral import spectral_conv
 
 CSV = os.environ.get("DOCS_TUNER_CSV", "/tmp/docs_tuner.csv")

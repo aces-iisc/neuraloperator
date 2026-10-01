@@ -1,12 +1,18 @@
 import jax
 import jax.numpy as jnp
 
+from ..arch import TPU_V5E
+
 # Memory-bound on v5e: the extra MXU passes of true-f32 matmuls hide behind the HBM wait, so
 # 'highest' precision is FREE here (measured Δtime 0, accuracy Δ +0.0008). Set it globally, once,
 # for every module that imports this one (FFT + FNO + Pallas). No per-call precision= needed.
 jax.config.update("jax_default_matmul_precision", "highest")
 
-RADIX = 128                # one radix-RADIX stage per sweep; 128 = the MXU tile edge
+# The radix of a staged sweep and the width at which folding a stage transpose into the matmul
+# starts to pay are both properties of the matrix unit, not of the transform. They default to
+# the TPU v5e here so existing callers are unchanged; pass an Accelerator to retarget.
+DEFAULT_ACCEL = TPU_V5E
+RADIX = DEFAULT_ACCEL.radix          # one radix-RADIX stage per sweep = the unit's tile edge
 F = jnp.float32
 BF = jnp.bfloat16
 I8 = jnp.int8
@@ -16,7 +22,7 @@ CDTYPE = jnp.complex64     # only for the complex reference FFTs in experimental
 BYTES_PER_COMPONENT = {F: 4, BF: 2, I8: 1}   # f32->complex64, bf16->"complex32", int8->"complex16"
 
 # A radix stage contracts over a whole 3-D block; the leaf is a plain 2-D matmul.
-CBK_MIN_COLS = 64          # fold the stage transpose into the matmul only above this width
+CBK_MIN_COLS = DEFAULT_ACCEL.transpose_fold_cols   # measured crossover for this unit
 
 # Two spellings of one radix stage. 'cbk' makes the permutation the matmul's write pattern, so
 # the transposed copy is never materialised. It pays only on wide stages; the threshold is

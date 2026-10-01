@@ -10,12 +10,30 @@ several times, which is the thing this package exists to avoid.
   traces   xprof captures written by an earlier entry (parsed, not re-measured)
 """
 
+# Each docs_* bench writes wherever its own env var says.  CSV_ENV routes them into REPRO_OUT
+# so one run leaves one directory of results rather than scattering them across /tmp.
+CSV_ENV = {
+    "docs_bench2": "DOCS_B2_CSV",
+    "docs_kappa": "DOCS_KAPPA_CSV",
+    "docs_karatsuba": "DOCS_KAR_CSV",
+    "docs_gemm": "DOCS_GEMM_CSV",
+    "docs_pack": "DOCS_PACK_CSV",
+    "docs_cbk": "DOCS_CBK_CSV",
+    "docs_modes": "DOCS_MODES_OUT",
+    "docs_bstar": "DOCS_BSTAR_CSV",
+    "docs_tuner": "DOCS_TUNER_CSV",
+    "docs_final": "DOCS_FINAL_CSV",
+    "docs_fact": "DOCS_FACT_CSV",
+    "docs_modesweep2d": "SW_CSV",
+}
+
+
 # (module, [tables it fills], needs, one-line note)
 ENTRIES = [
-    ("train_all", [], ("data",),
+    (".train_all", [], ("data",),
      "trains one model per dataset on H1 and caches the weights"),
 
-    ("tab_ladder", ["tab:ladder"], ("data", "weights"),
+    (".tab_ladder", ["tab:ladder"], ("data", "weights"),
      "every Section 5 optimisation, each measured against the previous one"),
 
     ("..experimental.bench.docs_bench2",
@@ -24,8 +42,9 @@ ENTRIES = [
      "one 1-D engine sweep; the four tables above read the same run"),
 
     ("..experimental.bench.parse_ops",
-     ["tab:enginebreakdown", "tab:enginetrade", "tab:ops256"], ("traces",),
-     "per-operation device time from docs_bench2's traces -- parsing, not a re-run"),
+     ["tab:enginebreakdown", "tab:enginetrade", "tab:ops256"], ("traces", "tensorflow"),
+     "per-operation device time from docs_bench2's traces; needs TensorFlow to read xplane, "
+     "so it runs off-box after the traces come back"),
 
     ("..experimental.bench.docs_kappa", ["tab:leafsmall"], (),
      "leaf size against splitting all the way"),
@@ -57,7 +76,9 @@ ENTRIES = [
     ("..experimental.bench.docs_fact", ["tab:factorized"], ("data",),
      "F-FNO and TFNO against the dense filter"),
 
-    ("..experimental.bench.docs_modesweep2d", ["fig:modesweep2d"], (),
+    # 772 runs, roughly two hours.  Fills a figure rather than a table, so it is not part of
+    # a default reproduction; ask for it by name.
+    ("..experimental.bench.docs_modesweep2d", ["fig:modesweep2d"], ("slow",),
      "row methods over the n_modes x N grid"),
 ]
 

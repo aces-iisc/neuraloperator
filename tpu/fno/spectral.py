@@ -1,62 +1,59 @@
 import jax.numpy as jnp
+import numpy as np
 
 from ..fft.core import ACC, F
+from ..fft.transform import FFT
 from .layers import spectral_block
 
 # einsum letters: n=sample c/i=in-channel o=out-channel h=row w=col
 #                 a=row mode (the 2m band)  d=col mode (the low m)
 _E = lambda spec, mat, x: jnp.einsum(spec, mat, x, preferred_element_type=ACC)
 
+DEFAULT_FFT = FFT()          # TPU v5e; pass another to retarget without editing the layer
+
 
 def _dft_rows(mode_idx, length, sign):
     """(cos, sin) rows of a length-`length` DFT restricted to the mode indices `mode_idx`.
-    sign=-1 builds the forward transform, +1 the inverse.  Each is (len(mode_idx), length)."""
+    sign=-1 builds the forward transform, +1 the inverse.  Each is (len(mode_idx), length).
+
+    Kept for the benches that build matrices directly; the layer goes through FFT."""
     k = jnp.asarray(mode_idx)[:, None]
     n = jnp.arange(length)[None, :]
     angle = (sign * 2.0 * jnp.pi / length) * (k * n).astype(F)
     return jnp.cos(angle), jnp.sin(angle)
 
 
-def spectral_conv(weight, x, n_modes, dtype=F):
+def spectral_conv(weight, x, n_modes, dtype=F, fft=None):
     """One FNO spectral convolution, done entirely in real/imag — no complex64 anywhere.
 
     Four steps, each a matmul over one axis:
-      1. transform the rows, keeping only the low +/- band  (real input, so 2 matmuls)
-      2. transform the cols, keeping only the low modes     (complex now, so 4)
+      1. transform the rows, keeping only the low +/- band  (real input, so 2 matmuls stacked)
+      2. transform the cols, keeping only the low modes     (complex now)
       3. mix channels independently at every kept mode      (the learned weight)
       4. transform both axes back and take the real part
 
     Steps 1-2 compute ONLY the modes that survive truncation, so no full FFT ever happens, and
-    step 4 reconstructs the full field straight from them — the un-kept modes are implicitly zero,
-    with no padding tensor.  `n_modes` is the TOTAL band width, so each corner holds n_modes//2.
-    `weight` is {w_re, w_im} of shape (n_modes, n_modes//2, in_ch, out_ch), or a
+    step 4 reconstructs the full field straight from them — the un-kept modes are implicitly
+    zero, with no padding tensor.  `n_modes` is the TOTAL band width, so each corner holds
+    n_modes//2.  `weight` is {w_re, w_im} of shape (n_modes, n_modes//2, in_ch, out_ch), or a
     prebuilt {w_block} from layers.prebuild_blocks.
-    `dtype` is the operand precision the transform is carried in: F is the f32 default, BF halves
-    the activation bytes on a memory-bound kernel.  Accumulation stays f32 either way.
+    `dtype` is the operand precision the transform is carried in: F is the f32 default, BF
+    halves the activation bytes on a memory-bound kernel.  Accumulation stays f32 either way.
+    `fft` selects the transform, and with it the accelerator it is shaped for.
     x (B, in_ch, H, W) real -> (B, out_ch, H, W) real."""
     n_rows, n_cols = x.shape[-2], x.shape[-1]
     half = n_modes // 2          # n_modes counts BOTH corners; each corner holds half of them
     n_ch = (weight["w_block"].shape[3] // 2 if "w_block" in weight
             else weight["w_re"].shape[3])      # (a, d, in, out): out is the minor axis
-    x = x.astype(dtype)
+    transform = fft if fft is not None else (DEFAULT_FFT if dtype is DEFAULT_FFT.dtype
+                                             else FFT(DEFAULT_FFT.accel, dtype))
+    row_band = transform.band(n_modes, n_rows)
+    col_band = transform.half_band(n_modes)
 
-    # 1. rows -> both low-frequency corners, n_modes wavenumbers in total.
-    #    cos and sin hit the SAME x, so they go as one matmul with the two matrices stacked
-    #    along the output axis; the MXU sees twice the rows per call.
-    row_band = jnp.concatenate([jnp.arange(half), jnp.arange(n_rows - half, n_rows)])
-    row_cos, row_sin = (m.astype(dtype) for m in _dft_rows(row_band, n_rows, -1))
-    band = row_band.shape[0]
-    rows_both = _E("ah,nchw->ncaw", jnp.concatenate([row_cos, row_sin], axis=0), x)
-    rows_re, rows_im = rows_both[:, :, :band], rows_both[:, :, band:]
-
-    # 2. cols -> the low n_modes only (this axis is rfft'd, so negative cols are redundant),
-    #    again with cos and sin stacked into one matmul per operand
-    col_cos, col_sin = (c.astype(dtype) for c in _dft_rows(jnp.arange(half), n_cols, -1))
-    col_both = jnp.concatenate([col_cos, col_sin], axis=0)
-    over_cols = lambda z: _E("dw,ncaw->ncad", col_both, z)
-    from_re, from_im = over_cols(rows_re), over_cols(rows_im)
-    modes_re = from_re[..., :half] - from_im[..., half:]
-    modes_im = from_re[..., half:] + from_im[..., :half]
+    # 1-2. rows to both low-frequency corners, then cols to the low modes.  Each pass contracts
+    #      its own axis in full and truncates only its OUTPUT, so the two truncations compound.
+    rows_re, rows_im = transform.rows_forward(x, row_band)
+    modes_re, modes_im = transform.cols_forward(rows_re, rows_im, col_band, n_cols)
 
     # 3. learned complex channel mix, per kept mode, as ONE real block matmul:
     #    [[w_re, -w_im], [w_im, w_re]] against [modes_re; modes_im].  Same arithmetic as the
@@ -70,26 +67,41 @@ def spectral_conv(weight, x, n_modes, dtype=F):
     mixed = _E("adio,niad->noad", w_block, z_block)
     mixed_re, mixed_im = mixed[:, :n_ch], mixed[:, n_ch:]
 
-    # 4a. cols back, folding in the Hermitian partners the rfft'd axis left out
-    #     (DC counts once, every other mode twice — that is its -k conjugate)
-    col_modes = jnp.arange(half)
-    hermitian_fold = jnp.where(col_modes == 0, 1.0, 2.0).astype(F)
-    inv_col_cos, inv_col_sin = _dft_rows(col_modes, n_cols, +1)
-    inv_col_cos = (inv_col_cos * hermitian_fold[:, None]).T          # (n_cols, n_modes)
-    inv_col_sin = (inv_col_sin * hermitian_fold[:, None]).T
-    #     same block form as step 3: [[cos, -sin], [sin, cos]] against [re ; im], one matmul
-    inv_col_block = jnp.concatenate(
-        [jnp.concatenate([inv_col_cos, -inv_col_sin], axis=1),
-         jnp.concatenate([inv_col_sin, inv_col_cos], axis=1)], axis=0)      # (2*n_cols, 2*half)
-    mixed_block = jnp.concatenate([mixed_re, mixed_im], axis=-1)            # (..., 2*half)
-    cols_back = _E("wd,noad->noaw", inv_col_block, mixed_block)
-    cols_back_re, cols_back_im = cols_back[..., :n_cols], cols_back[..., n_cols:]
+    # 4. both axes back; the column pass folds in the Hermitian partners the one-sided axis
+    #    left out, and the row pass keeps only the real part.
+    cols_re, cols_im = transform.cols_inverse(mixed_re, mixed_im, col_band, n_cols)
+    field = transform.rows_inverse(cols_re, cols_im, row_band, n_rows)
+    return (field / (n_rows * n_cols)).astype(F)
 
-    # 4b. rows back over the same band; the field is real, so only the real part survives, so
-    #     the cosine and sine halves fold into a single matmul rather than two
-    inv_row_cos, inv_row_sin = _dft_rows(row_band, n_rows, +1)
-    inv_row_block = jnp.concatenate([inv_row_cos, -inv_row_sin], axis=0)    # (2*band, n_rows)
-    cols_block = jnp.concatenate([cols_back_re, cols_back_im], axis=2)      # (..., 2*band, ...)
-    field = _E("ha,noaw->nohw", inv_row_block.T, cols_block)
 
+def separable_conv(weight, x, n_modes, dtype=F, fft=None):
+    """F-FNO's spectral convolution: one weight per axis instead of one per mode pair.
+
+    The dense filter carries a weight for every (channel pair, mode PAIR).  This carries one per
+    channel pair and AXIS, and adds the two results, so the m*m/2 mode cells collapse to m row
+    modes plus m/2 column modes.  Weights are {kr, ki, lr, li}, each (modes, in_ch, out_ch),
+    blocked and stacked the same way the dense filter is.
+
+    This changes the model, not just how it is evaluated: it is a different parameterisation
+    with its own accuracy, so it does not reproduce the dense output.
+    """
+    n_rows, n_cols = x.shape[-2], x.shape[-1]
+    n_ch = weight["k_block"].shape[2] // 2
+    transform = fft if fft is not None else (DEFAULT_FFT if dtype is DEFAULT_FFT.dtype
+                                             else FFT(DEFAULT_FFT.accel, dtype))
+    row_band = transform.band(n_modes, n_rows)
+    col_band = transform.half_band(n_modes)
+
+    rows_re, rows_im = transform.rows_forward(x, row_band)
+    modes_re, modes_im = transform.cols_forward(rows_re, rows_im, col_band, n_cols)
+
+    # one contraction per axis, summed: W[a, d] = W_row[a] + W_col[d] is an outer sum, so the
+    # two weights never have to be combined into a mode-pair grid.
+    z = jnp.concatenate([modes_re.astype(dtype), modes_im.astype(dtype)], axis=1)
+    mixed = (_E("aio,niad->noad", weight["k_block"].astype(dtype), z)
+             + _E("dio,niad->noad", weight["l_block"].astype(dtype), z))
+    mixed_re, mixed_im = mixed[:, :n_ch], mixed[:, n_ch:]
+
+    cols_re, cols_im = transform.cols_inverse(mixed_re, mixed_im, col_band, n_cols)
+    field = transform.rows_inverse(cols_re, cols_im, row_band, n_rows)
     return (field / (n_rows * n_cols)).astype(F)

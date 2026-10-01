@@ -4,16 +4,18 @@ import csv, os, time
 import jax, jax.numpy as jnp, numpy as np
 
 from ...fft.core import BF, F
-from ...fno import data, model, spectral
+from ...fno import layers, data, model, spectral
 from ..fno.reference import forward as jnp_forward
 
 CSV = os.environ.get("DOCS_FINAL_CSV", "/tmp/docs_final.csv")
 ROOT = os.path.expanduser(os.environ.get("DOCS_DATA", "~/data"))
-WEIGHTS = os.path.expanduser("~/nop/tpu/results/baseline")
-FIELDS = ["part", "case", "config", "dtype", "batch", "us_per_sample", "rel_l2", "status"]
+WEIGHTS = os.path.expanduser(os.environ.get("REPRO_WEIGHTS", "~/repro_out/weights"))
+FIELDS = ["part", "case", "config", "dtype", "batch", "us_per_sample",
+          "loss", "error", "h1", "l2", "status"]
 REPS = 20
 PAPER_B = 128                      # train.INFER_CAP, what the baseline numbers use
 
+LOSS = {"Burgers": "l2", "Darcy-32": "h1", "Darcy-64": "h1", "NS-128": "h1"}
 CASES = [("Burgers",  lambda: data.load_burgers(ROOT),   24, 16),
          ("Darcy-32", lambda: data.load_darcy(ROOT, 32), 24, 16),
          ("Darcy-64", lambda: data.load_darcy(ROOT, 64), 24, 16),
@@ -25,15 +27,22 @@ def save(r):
         w = csv.DictWriter(fh, fieldnames=FIELDS); w.writeheader(); w.writerows(r)
 
 
-def rel_l2(f, xte, yte, B, n_eval):
-    e = d = 0.0
-    for s in range(0, n_eval, B):
-        p = np.asarray(f(jnp.asarray(np.asarray(xte[s:s+B], np.float32))))
-        g = np.asarray(yte[s:s+B], np.float32)
-        ax = tuple(range(1, g.ndim))
-        e += float(np.sum(np.sqrt(np.sum((p-g)**2, axis=ax))))
-        d += float(np.sum(np.sqrt(np.sum(g**2, axis=ax))))
-    return e/d
+def rel_errors(f, xte, yte, B, n_eval):
+    """Relative H1 and L2 over the test split, chunked.
+
+    Both are reported: the model is judged on the objective its config trains with, and the
+    other is carried because the FNO literature quotes relative L2 and a table with only one
+    of them cannot be placed against it.
+    """
+    totals = {"h1": [0.0, 0.0], "l2": [0.0, 0.0]}
+    for start in range(0, n_eval, B):
+        pred = f(jnp.asarray(np.asarray(xte[start:start + B], np.float32)))
+        gold = jnp.asarray(np.asarray(yte[start:start + B], np.float32))
+        for name, fn in (("h1", layers.h1_rel), ("l2", layers.lp_rel)):
+            totals[name][0] += float(fn(pred, gold))
+            totals[name][1] += gold.shape[0]
+    # both losses sum over the batch, so divide by the count to get a per-sample figure
+    return {k: v[0] / max(1, v[1]) for k, v in totals.items()}
 
 
 def wall(f, x):
@@ -66,12 +75,14 @@ def main():
                     us = wall(jax.jit(lambda z: model.forward(P, z, nm, dt)), x)
                     if us < best[1]: best = (B, us)
                     rows.append({"part": "A", "case": label, "config": "sweep", "dtype": dn,
-                                 "batch": B, "us_per_sample": us, "rel_l2": float("nan"),
+                                 "batch": B, "us_per_sample": us, "loss": LOSS.get(label, "h1"), "error": float("nan"),
+                             "h1": float("nan"), "l2": float("nan"),
                                  "status": "ok"})
                 except Exception as exc:
                     rows.append({"part": "A", "case": label, "config": "sweep", "dtype": dn,
                                  "batch": B, "us_per_sample": float("nan"),
-                                 "rel_l2": float("nan"), "status": type(exc).__name__})
+                                 "loss": LOSS.get(label, "h1"), "error": float("nan"),
+                             "h1": float("nan"), "l2": float("nan"), "status": type(exc).__name__})
                 save(rows)
             bstar[(label, dn)] = best[0]
             print(f"  {label:<10}{dn:>7}{best[0]:>6}{best[1]:>16.2f}   <- best", flush=True)
@@ -97,14 +108,19 @@ def main():
                 f = jax.jit(lambda z, _p=params, _f=fwd, _d=dt:
                             _f(_p, z, nm) if _f is jnp_forward else _f(_p, z, nm, _d))
                 x = jnp.asarray(np.asarray(xte[:B], np.float32))
-                us = wall(f, x); rl = rel_l2(f, xte, yte, B, n_eval)
-                print(f"  {label:<10}{cname:<26}{B:>5}{us:>16.2f}{rl:>12.4e}", flush=True)
+                us = wall(f, x); errs = rel_errors(f, xte, yte, B, n_eval)
+                loss = LOSS.get(label, "h1")
+                print(f"  {label:<10}{cname:<26}{B:>5}{us:>16.2f}"
+                      f"{errs[loss]:>12.4e} ({loss})", flush=True)
                 rows.append({"part": "B", "case": label, "config": cname, "dtype": str(dt.__name__),
-                             "batch": B, "us_per_sample": us, "rel_l2": rl, "status": "ok"})
+                             "batch": B, "us_per_sample": us, "loss": loss,
+                             "error": errs[loss], "h1": errs["h1"], "l2": errs["l2"],
+                             "status": "ok"})
             except Exception as exc:
                 print(f"  {label:<10}{cname:<26}{B:>5}{type(exc).__name__:>16}", flush=True)
                 rows.append({"part": "B", "case": label, "config": cname, "dtype": str(dt.__name__),
-                             "batch": B, "us_per_sample": float("nan"), "rel_l2": float("nan"),
+                             "batch": B, "us_per_sample": float("nan"), "loss": LOSS.get(label, "h1"), "error": float("nan"),
+                             "h1": float("nan"), "l2": float("nan"),
                              "status": type(exc).__name__})
             save(rows)
         print(flush=True)

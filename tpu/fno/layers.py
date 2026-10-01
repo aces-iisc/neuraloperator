@@ -149,3 +149,33 @@ def adam_step(P, grads, state, lr=1e-3, weight_decay=1e-4, b1=0.9, b2=0.999, eps
     P = tree_map(lambda p, mh, vh: p - lr * (mh / (jnp.sqrt(vh) + eps) + weight_decay * p),
                  P, m_hat, v_hat)
     return P, {"m": m, "v": v, "t": t}
+
+
+def init_separable_weight(key, in_ch, out_ch, n_modes):
+    """F-FNO's per-axis spectral weights, already in the blocked, channels-minor form.
+
+    Row weights span the full band, column weights the one-sided half, matching what the
+    transform keeps on each axis."""
+    scale = (2.0 / (in_ch + out_ch)) ** 0.5
+    keys = jax.random.split(key, 4)
+    shapes = ((n_modes, in_ch, out_ch), (n_modes // 2, in_ch, out_ch))
+    kr, ki = (scale * jax.random.normal(keys[i], shapes[0], F) for i in (0, 1))
+    lr, li = (scale * jax.random.normal(keys[i], shapes[1], F) for i in (2, 3))
+    return {"k_block": _axis_block(kr, ki), "l_block": _axis_block(lr, li)}
+
+
+def _axis_block(w_re, w_im):
+    """[[re, -im], [im, re]] for one axis weight, channels stacked and kept minor."""
+    left = jnp.concatenate([w_re, -w_im], axis=1)        # (modes, 2*in, out)
+    right = jnp.concatenate([w_im, w_re], axis=1)
+    return jnp.concatenate([left, right], axis=2)        # (modes, 2*in, 2*out)
+
+
+def init_fno_separable(key, in_ch, out_ch, channels, n_modes, n_layers):
+    """init_fno with F-FNO filters in place of the dense ones."""
+    tree = init_fno(key, in_ch, out_ch, channels, n_modes, n_layers)
+    filters = jax.random.split(jax.random.fold_in(key, 7), n_layers)
+    tree["blocks"] = [{**b, "filter": init_separable_weight(filters[i], channels, channels,
+                                                            n_modes)}
+                      for i, b in enumerate(tree["blocks"])]
+    return tree

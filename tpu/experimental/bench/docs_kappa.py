@@ -45,7 +45,7 @@ def main():
                          "hbm_mb":hbm/1e6,"gflop":fl/1e9,"rel_err":err,
                          "trace":f"N{n}_{'split' if leaf is None else leaf}"})
         print(flush=True)
-    with open("/tmp/docs_kappa.csv","w",newline="") as fh:
+    with open(os.environ.get("DOCS_KAPPA_CSV", "/tmp/docs_kappa.csv"),"w",newline="") as fh:
         wr=csv.DictWriter(fh,fieldnames=sorted({k for r in rows for k in r})); wr.writeheader(); wr.writerows(rows)
     print("KAPPA_DONE", flush=True)
 
