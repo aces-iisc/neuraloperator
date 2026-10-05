@@ -106,3 +106,12 @@ tpu/experimental/hlo_vmem/hlo*/
 tpu/experimental/hlo_vmem/*.tar.gz
 tpu/traces/
 tpu/experimental/hlo_vmem/*.entry.txt
+
+# Measurement artifacts.  The CSVs are the record every table verifies against and are small;
+# weights, profiler traces and HLO dumps are regenerable and run to gigabytes.
+*.npz
+*.tar.gz
+*.xplane.pb
+tpu/results/**/weights/
+tpu/results/**/traces*/
+tpu/experimental/hlo_vmem/

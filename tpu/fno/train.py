@@ -57,29 +57,22 @@ def train(xtr, ytr, xte, yte, n_modes=16, channels=32, n_layers=4, steps=200, ba
 
     @jax.jit
     def eval_chunk(P, x, y):
-        """Per-sample numerator and denominator of the relative error, in the TRAINING metric.
+        """The training objective over one chunk, still summed over the samples in it.
 
-        Evaluating on something other than the objective would early-stop on a criterion the
-        model is not being optimised for, so the H1 derivative terms are included whenever the
-        loss is H1."""
-        pred = fwd(P, x, n_modes)
-        err = jnp.sum((pred - y) ** 2, (-1, -2, -3))
-        norm = jnp.sum(y ** 2, (-1, -2, -3))
-        if loss == "h1":
-            for axis in (-1, -2):
-                d_pred = jnp.diff(pred, axis=axis, append=jnp.take(pred, jnp.array([0]), axis))
-                d_y = jnp.diff(y, axis=axis, append=jnp.take(y, jnp.array([0]), axis))
-                err = err + jnp.sum((d_pred - d_y) ** 2, (-1, -2, -3))
-                norm = norm + jnp.sum(d_y ** 2, (-1, -2, -3))
-        return err, norm
+        This is the objective itself rather than a second metric built alongside it: evaluating
+        on something else would early-stop on a criterion the model is not being optimised for,
+        and a reimplementation would be free to drift from it -- as it did, by differencing the
+        field forward instead of centrally and dropping the 1/h the H1 norm weights derivatives
+        with."""
+        return LOSSES[loss](fwd(P, x, n_modes), y)
 
     def test_rel(P):
-        err = norm = 0.0
+        """Mean relative error per sample, the reduction the reference reports."""
+        total = 0.0
         for i in range(0, xte.shape[0], EVAL_CHUNK):
-            e, n = eval_chunk(P, jnp.asarray(xte[i:i + EVAL_CHUNK]), jnp.asarray(yte[i:i + EVAL_CHUNK]))
-            err += float(jnp.sum(jnp.sqrt(e)))
-            norm += float(jnp.sum(jnp.sqrt(n)))
-        return err / norm
+            total += float(eval_chunk(P, jnp.asarray(xte[i:i + EVAL_CHUNK]),
+                                      jnp.asarray(yte[i:i + EVAL_CHUNK])))
+        return total / xte.shape[0]
 
     if verbose:
         print(f"{name}: channels={channels} n_modes={n_modes} | {n_train} train / {xte.shape[0]} "
@@ -97,8 +90,9 @@ def train(xtr, ytr, xte, yte, n_modes=16, channels=32, n_layers=4, steps=200, ba
         epoch_loss = 0.0
         for b in range(n_batches):
             idx = order[b * batch:(b + 1) * batch]
-            P, opt, loss = train_step(P, opt, jnp.asarray(xtr[idx]), jnp.asarray(ytr[idx]), lr_now)
-            epoch_loss += float(loss)
+            P, opt, batch_loss = train_step(P, opt, jnp.asarray(xtr[idx]),
+                                            jnp.asarray(ytr[idx]), lr_now)
+            epoch_loss += float(batch_loss)
 
         if epoch % log_every == 0 or epoch == steps - 1:
             rel = test_rel(P)

@@ -11,7 +11,7 @@ import os
 import time
 
 from ..fno import layers, model, train
-from ..fno.spectral import separable_conv
+from ..fno.spectral import cp_conv, separable_conv
 from ..experimental.fno import reference
 from .common import CASES, Paths
 
@@ -28,7 +28,9 @@ class Trainer:
                ("jnp", reference.forward),
                # F-FNO is a different parameterisation, so it is trained separately rather
                # than evaluated on the dense weights
-               ("ffno", lambda P, x, m: model.forward(P, x, m, conv=separable_conv))]
+               ("ffno", lambda P, x, m: model.forward(P, x, m, conv=separable_conv)),
+               # TFNO: a rank-R CP filter, likewise its own parameterisation
+               ("tfno", lambda P, x, m: model.forward(P, x, m, conv=cp_conv))]
 
     def run(self):
         print(f"\n### trained weights ({self.EPOCHS} epochs, objective per config)", flush=True)
@@ -50,7 +52,8 @@ class Trainer:
 
     def _train_one(self, case, engine, forward, loaded, path):
         x_tr, y_tr, x_te, y_te = loaded
-        init = (layers.init_fno_separable if engine == "ffno" else None)
+        init = {"ffno": layers.init_fno_separable,
+                "tfno": layers.init_fno_cp}.get(engine)
         start = time.perf_counter()
         try:
             params, err, _ = train.train(x_tr, y_tr, x_te, y_te, n_modes=case.n_modes,

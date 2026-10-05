@@ -96,7 +96,9 @@ def cp_filter(w, fr, fi):
 
 
 def cp_init(key, cin, cout, m, rank=8):
-    s = (1.0 / (cin + cout + 2 * m)) ** 0.5
+    # Var(W) = rank * s^8 for a sum of rank-one terms, so match the dense initialiser's variance
+    # rather than drawing each factor as if it were the weight itself.
+    s = ((2.0 / (cin + cout)) / rank) ** 0.125
     d = {}
     ks = jax.random.split(key, 8)
     for j, part in enumerate(("re_", "im_")):

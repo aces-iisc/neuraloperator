@@ -1,0 +1,21 @@
+Darcy-32_adio                                    31.93 us   DMA / HBM=0.11  MXU matmul=26.25  reshape / copy=5.57
+Darcy-32_dense                                   23.30 us   DMA / HBM=1.36  MXU matmul=5.34  VPU / fusion=1.29  async-done=2.65  async-start=0.02  custom-call (fft)=0.00  reshape / copy=12.64
+Darcy-32_f-fno                                   24.62 us   DMA / HBM=1.43  MXU matmul=9.30  VPU / fusion=1.29  reshape / copy=12.61
+Darcy-32_fused                                   25.31 us   DMA / HBM=0.87  MXU matmul=9.67  VPU / fusion=1.92  reshape / copy=12.84
+Darcy-32_fused2                                  26.63 us   DMA / HBM=0.03  MXU matmul=11.90  VPU / fusion=6.68  reshape / copy=8.03
+Darcy-32_published                               32.21 us   DMA / HBM=0.10  MXU matmul=26.52  reshape / copy=5.59
+Darcy-32_stacked                                 27.94 us   DMA / HBM=0.98  MXU matmul=16.51  reshape / copy=10.45
+Darcy-64_adio                                    31.88 us   DMA / HBM=0.11  MXU matmul=26.24  reshape / copy=5.54
+Darcy-64_dense                                   23.30 us   DMA / HBM=1.40  MXU matmul=5.34  VPU / fusion=1.29  async-done=2.65  async-start=0.02  custom-call (fft)=0.00  reshape / copy=12.60
+Darcy-64_f-fno                                   24.70 us   DMA / HBM=1.37  MXU matmul=9.30  VPU / fusion=1.29  reshape / copy=12.74
+Darcy-64_fused                                   25.31 us   DMA / HBM=0.90  MXU matmul=9.67  VPU / fusion=1.92  reshape / copy=12.82
+Darcy-64_fused2                                  26.57 us   DMA / HBM=0.03  MXU matmul=11.90  VPU / fusion=6.66  reshape / copy=7.97
+Darcy-64_published                               32.22 us   DMA / HBM=0.10  MXU matmul=26.52  reshape / copy=5.61
+Darcy-64_stacked                                 27.94 us   DMA / HBM=0.97  MXU matmul=16.51  reshape / copy=10.45
+NS-128_adio                                      84.41 us   DMA / HBM=0.08  MXU matmul=56.13  async-done=0.01  async-start=0.02  custom-call (fft)=0.00  reshape / copy=28.16
+NS-128_dense                                    222.21 us   DMA / HBM=1.58  MXU matmul=180.42  VPU / fusion=4.56  reshape / copy=35.65
+NS-128_f-fno                                     64.22 us   DMA / HBM=2.66  MXU matmul=23.33  VPU / fusion=5.02  async-done=0.03  async-start=0.05  custom-call (fft)=0.00  reshape / copy=33.14
+NS-128_fused                                     60.69 us   DMA / HBM=4.83  MXU matmul=16.65  VPU / fusion=3.55  reshape / copy=35.67
+NS-128_fused2                                    58.42 us   DMA / HBM=0.02  MXU matmul=16.60  VPU / fusion=15.04  async-done=0.01  async-start=0.03  custom-call (fft)=0.00  reshape / copy=26.72
+NS-128_published                                 84.30 us   DMA / HBM=0.08  MXU matmul=56.00  async-done=0.01  async-start=0.02  custom-call (fft)=0.00  reshape / copy=28.18
+NS-128_stacked                                   77.28 us   DMA / HBM=4.17  MXU matmul=44.48  reshape / copy=28.64

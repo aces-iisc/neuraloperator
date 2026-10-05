@@ -130,3 +130,84 @@ def cp_filter_stacked(w, fr, fi):
         return _E("or,brkl->bokl", w[p + "B"], block)
 
     return part("re_", 0) - part("im_", 1), part("im_", 0) + part("re_", 1)
+
+
+# ── third round: block the CP product the way the dense one is blocked ──────────────
+# cp_filter_opt applies the rank-R operator four times (Wre·fre, Wim·fim, Wim·fre, Wre·fim),
+# which is eight einsums and eight full-size temporaries -- the same four-product form the dense
+# filter stopped using in Section 5.2.  Two things fix it.
+#
+#   1. Both halves of the input contract against the SAME stacked A, so stacking [fre ; fim] on
+#      the batch axis turns four Cin contractions into one.
+#   2. The four rank-space results are then a single 4R-wide operand, and the four B products
+#      that follow are one (2Cout x 4R) matmul.  On a 128-wide unit a 4R = 32 contraction beats
+#      four separate R = 8 contractions even though the block is half zeros.
+#
+# Net: two einsums instead of eight, contracting 32 and producing 48 rather than contracting 8.
+def cp_block_fused(w):
+    """Stack A over the rank axis and prebuild the (2Cout x 4R) output block and the mode scale.
+
+    C[k,r]·D[l,r] does not depend on the data, so it is formed once here rather than as two
+    broadcast multiplies on every call."""
+    rank = w["re_A"].shape[1]
+    cout = w["re_B"].shape[0]
+    out = {
+        # (2r, i): one contraction for both halves of the input
+        "A_stack": jnp.concatenate([w["re_A"].T, w["im_A"].T], axis=0),
+    }
+    # the mode scale for the 4R operand, in the order [a, b, c, d] below
+    cd_re = w["re_C"].T[:, :, None] * w["re_D"].T[:, None, :]      # (r, k, l)
+    cd_im = w["im_C"].T[:, :, None] * w["im_D"].T[:, None, :]
+    out["cd"] = jnp.concatenate([cd_re, cd_im, cd_re, cd_im], axis=0)   # (4r, k, l)
+
+    # [[Br, 0, 0, -Bi], [0, Bi, Br, 0]] against [a, b, c, d]
+    z = jnp.zeros_like(w["re_B"])
+    g_re = jnp.concatenate([w["re_B"], z, z, -w["im_B"]], axis=1)       # (o, 4r)
+    g_im = jnp.concatenate([z, w["im_B"], w["re_B"], z], axis=1)
+    out["B_block"] = jnp.concatenate([g_re, g_im], axis=0)              # (2o, 4r)
+    out["rank"], out["cout"] = rank, cout
+    return out
+
+
+def cp_filter_fused(w, fr, fi):
+    """Two einsums: contract the input channel once, then the rank axis once."""
+    batch = fr.shape[0]
+    z = jnp.concatenate([fr, fi], axis=0)                      # (2b, i, k, l)
+    t = _E("ri,bikl->brkl", w["A_stack"], z)                   # (2b, 2r, k, l)
+    # [a, b] from the real half, [c, d] from the imaginary half
+    v = jnp.concatenate([t[:batch], t[batch:]], axis=1)        # (b, 4r, k, l)
+    v = v * w["cd"][None]
+    mixed = _E("or,brkl->bokl", w["B_block"], v)               # (b, 2o, k, l)
+    cout = w["cout"]
+    return mixed[:, :cout], mixed[:, cout:]
+
+
+# ── fourth round, driven by the fused trace ────────────────────────────────────────
+# cp_filter_fused cut MXU time by 2.7x on Darcy and 3.4x on NS, and then spent half of what it
+# saved on copies: stacking the input on the BATCH axis means the two halves come back separated
+# by batch, so rebuilding the 4R operand is a slice and a concat on a full-size array.
+#
+# Stacking on the CHANNEL axis instead removes that.  With z = [fre ; fim] along channels and a
+# block-diagonal A, one contraction emits the 4R operand already in the right order, and the
+# contracted axis doubles from Cin to 2*Cin as a side effect -- the same widening the dense
+# filter gets from blocking.
+def cp_block_fused2(w):
+    rank, cin = w["re_A"].shape[1], w["re_A"].shape[0]
+    out = cp_block_fused(w)                       # reuse cd, B_block, rank, cout
+    a_stack = out["A_stack"]                      # (2r, i)
+    zero = jnp.zeros_like(a_stack)
+    # [[A_stack, 0], [0, A_stack]] : (4r, 2i), so one contraction gives [a, b, c, d]
+    out["A_big"] = jnp.concatenate(
+        [jnp.concatenate([a_stack, zero], axis=1),
+         jnp.concatenate([zero, a_stack], axis=1)], axis=0)
+    return out
+
+
+def cp_filter_fused2(w, fr, fi):
+    """Two einsums and one concat: the 4R operand comes straight out of the first contraction."""
+    z = jnp.concatenate([fr, fi], axis=1)                      # (b, 2i, k, l)
+    v = _E("ri,bikl->brkl", w["A_big"], z)                     # (b, 4r, k, l), already ordered
+    v = v * w["cd"][None]
+    mixed = _E("or,brkl->bokl", w["B_block"], v)               # (b, 2o, k, l)
+    cout = w["cout"]
+    return mixed[:, :cout], mixed[:, cout:]

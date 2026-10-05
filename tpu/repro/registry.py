@@ -34,7 +34,11 @@ ENTRIES = [
      "trains one model per dataset on H1 and caches the weights"),
 
     (".tab_ladder", ["tab:ladder"], ("data", "weights"),
-     "every Section 5 optimisation, each measured against the previous one"),
+     "every optimisation, from the shipped default to the fastest configuration"),
+
+    # trains one model per rank, so it is the slow entry of the set; ask for it by name.
+    (".tab_cprank", ["tab:cprank"], ("data", "weights", "slow"),
+     "TFNO accuracy and time as the CP rank varies"),
 
     ("..experimental.bench.docs_bench2",
      ["tab:engines-1d", "tab:engines-bf16", "tab:partial-1d",
@@ -61,8 +65,12 @@ ENTRIES = [
     ("..experimental.bench.docs_cbk", ["tab:cbk"], (),
      "folding the stage transpose into the matmul"),
 
-    ("..experimental.bench.docs_modes", ["tab:modesweep", "tab:modeenergy"], ("data",),
+    ("..experimental.bench.docs_modes", ["tab:modesweep"], ("data",),
      "n_modes against accuracy and cost"),
+
+    ("..experimental.bench.docs_energy", ["tab:modeenergy"], ("data",),
+     "radial spectral energy per dataset and the band the rule reads off it; NumPy only, so it "
+     "needs no accelerator"),
 
     ("..experimental.bench.docs_bstar", ["tab:bstar"], ("data", "weights"),
      "inference at the training batch and at B*"),

@@ -5,16 +5,13 @@ copies and DMA, which is what the breakdown tables report.  REPS must match the 
 wrote the traces, otherwise every number is scaled wrong.
 
   parse_ops.py <trace-root> <REPS> [--ops]     --ops lists individual operations too
+
+The xplane files are read by xplane_mini, so this runs anywhere the traces can be copied to --
+it needs neither TensorFlow nor a TPU.
 """
 import collections, glob, os, sys
 
-from tensorflow.tsl.profiler.protobuf import xplane_pb2
-
-from .bench_jax import _hlo_bucket
-
-
-def _stat_names(plane):
-    return {m.id: m.name for m in plane.stat_metadata.values()}
+from .xplane_mini import _hlo_bucket, op_times as _op_times_file
 
 
 def op_times(trace_dir, reps):
@@ -22,32 +19,7 @@ def op_times(trace_dir, reps):
     traces = sorted(glob.glob(os.path.join(trace_dir, "**", "*.xplane.pb"), recursive=True))
     if not traces:
         return []
-    space = xplane_pb2.XSpace()
-    space.ParseFromString(open(traces[-1], "rb").read())
-    plane = next((p for p in space.planes if p.name == "/device:TPU:0"), None)
-    if plane is None:
-        return []
-
-    stat_name = _stat_names(plane)
-
-    def category_of(stats):
-        for stat in stats:
-            if stat_name.get(stat.metadata_id) == "hlo_category":
-                return stat.str_value or ""
-        return None
-
-    # hlo_category is attached to the event METADATA, not to each event occurrence
-    meta = {m.id: (m.name, category_of(m.stats)) for m in plane.event_metadata.values()}
-    out = []
-    for line in plane.lines:
-        if line.name != "XLA Ops":
-            continue
-        for event in line.events:
-            name, category = meta.get(event.metadata_id, ("?", None))
-            if category is None:
-                category = category_of(event.stats) or ""
-            out.append((name, category, event.duration_ps / 1e6 / reps))
-    return out
+    return _op_times_file(traces[-1], reps)
 
 
 def bucket_times(trace_dir, reps):

@@ -1,0 +1,2 @@
+case,loss,lr,lr_step,batch,epochs,rel_l2,train_s,weights
+Burgers,h1,0.0001,60,16,60,0.006207150762566229,18.515621166000017,/tmp/h1w_b/Burgers_h1.npz

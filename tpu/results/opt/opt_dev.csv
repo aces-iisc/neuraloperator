@@ -1,0 +1,37 @@
+case,variant,batch,us_per_sample,rel_err,status,trace,device_us
+Burgers,layer (spectral+skip+gelu),256,1.266953124967607,nan,ok,Burgers_layer_(spectralskipgelu),187.22
+Burgers,spectral only,256,1.2473789061662188,nan,ok,Burgers_spectral_only,165.79
+Burgers,skip only,256,0.7130468749894092,nan,ok,Burgers_skip_only,30.67
+Burgers,"layer, fused add+gelu",256,1.3234023437114217,nan,ok,"Burgers_layer,_fused_addgelu",187.13
+Burgers,conv base,256,1.2521875000226501,0.0,ok,Burgers_conv_base,165.82
+Burgers,conv layout,256,1.2459726562719098,0.0,ok,Burgers_conv_layout,166.00
+Burgers,conv hoist-fold,256,1.2582070312294746,0.0,ok,Burgers_conv_hoist-fold,167.64
+Burgers,conv bf16,256,1.1162499999883835,0.003273799910854293,ok,Burgers_conv_bf16,125.07
+Burgers,conv int8,256,1.0076171874651152,0.02525533122094244,ok,Burgers_conv_int8,90.66
+Darcy-32,layer (spectral+skip+gelu),256,2.2997656250467458,nan,ok,Darcy-32_layer_(spectralskipgelu),427.99
+Darcy-32,spectral only,256,1.839492187571956,nan,ok,Darcy-32_spectral_only,311.42
+Darcy-32,skip only,256,1.0485937499415954,nan,ok,Darcy-32_skip_only,116.05
+Darcy-32,"layer, fused add+gelu",256,2.30562499992093,nan,ok,"Darcy-32_layer,_fused_addgelu",427.97
+Darcy-32,conv base,256,1.8473046874412091,0.0,ok,Darcy-32_conv_base,311.44
+Darcy-32,conv layout,256,1.8531250000064503,0.0,ok,Darcy-32_conv_layout,311.75
+Darcy-32,conv hoist-fold,256,1.8612499999015597,0.0,ok,Darcy-32_conv_hoist-fold,313.27
+Darcy-32,conv bf16,256,1.6494492187657528,0.003298053373866772,ok,Darcy-32_conv_bf16,255.52
+Darcy-32,conv int8,256,1.4743320312371466,0.027634006585663496,ok,Darcy-32_conv_int8,210.10
+Darcy-64,layer (spectral+skip+gelu),128,6.370781250097934,nan,ok,Darcy-64_layer_(spectralskipgelu),650.94
+Darcy-64,spectral only,128,4.2870312499943,nan,ok,Darcy-64_spectral_only,378.99
+Darcy-64,skip only,128,2.9769531249002057,nan,ok,Darcy-64_skip_only,220.07
+Darcy-64,"layer, fused add+gelu",128,6.38616406245518,nan,ok,"Darcy-64_layer,_fused_addgelu",650.88
+Darcy-64,conv base,128,4.304218749862088,0.0,ok,Darcy-64_conv_base,379.06
+Darcy-64,conv layout,128,4.276171875261525,0.0,ok,Darcy-64_conv_layout,379.68
+Darcy-64,conv hoist-fold,128,4.292343750211813,0.0,ok,Darcy-64_conv_hoist-fold,378.46
+Darcy-64,conv bf16,128,4.005070312285142,0.003318375550994741,ok,Darcy-64_conv_bf16,358.26
+Darcy-64,conv int8,128,3.783828125047961,0.02699104451646641,ok,Darcy-64_conv_int8,321.80
+NS-128,layer (spectral+skip+gelu),8,109.61499999950775,nan,ok,NS-128_layer_(spectralskipgelu),711.30
+NS-128,spectral only,8,92.72000000493108,nan,ok,NS-128_spectral_only,578.59
+NS-128,skip only,8,38.541250006574046,nan,ok,NS-128_skip_only,150.45
+NS-128,"layer, fused add+gelu",8,110.177500005193,nan,ok,"NS-128_layer,_fused_addgelu",711.21
+NS-128,conv base,8,92.53124999730744,0.0,ok,NS-128_conv_base,578.52
+NS-128,conv layout,8,92.80000000444488,0.0,ok,NS-128_conv_layout,578.75
+NS-128,conv hoist-fold,8,154.3437500046707,0.0,ok,NS-128_conv_hoist-fold,1067.14
+NS-128,conv bf16,8,66.15249999697426,0.003393991600547312,ok,NS-128_conv_bf16,370.25
+NS-128,conv int8,8,nan,nan,OOM,,

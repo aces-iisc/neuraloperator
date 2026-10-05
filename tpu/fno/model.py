@@ -43,18 +43,30 @@ def save_params(P, path):
     return path
 
 
-def load_params(path, channels, n_modes, n_layers=4, in_ch=1, out_ch=1, seed=0):
-    """Rebuild a tree written by save_params.  The architecture args must match what was saved."""
+def load_params(path, channels, n_modes, n_layers=4, in_ch=1, out_ch=1, seed=0, init=None):
+    """Rebuild a tree written by save_params.  The architecture args must match what was saved.
+
+    `init` builds the skeleton the leaves are poured back into, and has to be the same one that
+    created them: a variant filter carries its own structure, and F-FNO's happens to have the
+    same number of leaves as the dense one, so reading it back through the dense skeleton
+    produces a tree that is wrong rather than one that fails to load.
+    """
     saved = np.load(path)
     leaves = [jnp.asarray(saved[f"arr_{i}"]) for i in range(len(saved.files))]
-    skeleton = init_fno(jax.random.PRNGKey(seed), in_ch, out_ch, channels, n_modes, n_layers)
+    build = init or init_fno
+    skeleton = build(jax.random.PRNGKey(seed), in_ch, out_ch, channels, n_modes, n_layers)
     want, treedef = jax.tree_util.tree_flatten(skeleton)
+    if len(leaves) != len(want):
+        raise ValueError(f"{path}: holds {len(leaves)} arrays, this architecture wants "
+                         f"{len(want)} -- wrong channels/n_modes/n_layers, or wrong init")
 
     # Checkpoints written before the filter moved its channels to the minor axes hold
     # (in, out, modes, modes/2); bring them forward rather than refusing to load.
     fixed = []
-    for leaf, ref in zip(leaves, want):
+    for i, (leaf, ref) in enumerate(zip(leaves, want)):
         if leaf.shape != ref.shape and leaf.ndim == 4 and leaf.transpose(2, 3, 0, 1).shape == ref.shape:
             leaf = leaf.transpose(2, 3, 0, 1)
+        if leaf.shape != ref.shape:
+            raise ValueError(f"{path}: array {i} is {leaf.shape}, skeleton wants {ref.shape}")
         fixed.append(leaf)
     return jax.tree_util.tree_unflatten(treedef, fixed)

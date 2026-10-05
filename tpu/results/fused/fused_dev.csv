@@ -1,0 +1,11 @@
+case,variant,block,wall_us,hbm_mb,rel_diff,status,trace,device_us
+Darcy-32,xla,0,178.83999998957734,80.865792,0.0,ok,Darcy-32_xla,37.76
+Darcy-32,fused,1,288.5599999444821,0.0,0.0,ok,Darcy-32_fused1,139.29
+Darcy-32,fused,2,240.06000012377626,0.0,0.0,ok,Darcy-32_fused2,90.22
+Darcy-32,fused,4,237.19000000710366,0.0,0.0,ok,Darcy-32_fused4,77.44
+Darcy-32,fused,8,206.87999995061546,0.0,0.0,ok,Darcy-32_fused8,60.82
+NS-128,xla,0,726.2799999807612,1015.493632,0.0,ok,NS-128_xla,578.39
+NS-128,fused,1,nan,nan,nan,OOM,,
+NS-128,fused,2,nan,nan,nan,OOM,,
+NS-128,fused,4,nan,nan,nan,OOM,,
+NS-128,fused,8,nan,nan,nan,OOM,,

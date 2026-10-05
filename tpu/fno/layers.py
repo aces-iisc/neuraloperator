@@ -179,3 +179,40 @@ def init_fno_separable(key, in_ch, out_ch, channels, n_modes, n_layers):
                                                             n_modes)}
                       for i, b in enumerate(tree["blocks"])]
     return tree
+
+
+def init_cp_weight(key, in_ch, out_ch, n_modes, rank=8):
+    """TFNO's rank-R CP factors for one layer, one set per real and imaginary part.
+
+    The factors themselves are the parameters, not the blocks the contraction uses: a blocked
+    form has structural zeros, and training one directly would fill them in and stop it being a
+    factorisation.  spectral.cp_conv assembles the blocks on each call from these.
+
+    C runs over the row band and D over the one-sided column band, matching what the transform
+    keeps on each axis.
+
+    A CP entry is a PRODUCT of four factors, so drawing each at the scale a dense weight would
+    use leaves the reconstructed filter s^4 instead of s -- 374x too small at these shapes, which
+    starts the spectral branch near zero and barely trains it.  For R independent rank-one terms
+    Var(W) = R s^8, so the factors are drawn at (sigma^2 / R)^(1/8) with sigma^2 the variance the
+    dense initialiser would use.
+    """
+    scale = ((2.0 / (in_ch + out_ch)) / rank) ** 0.125
+    keys = jax.random.split(key, 8)
+    out = {}
+    for j, part in enumerate(("re_", "im_")):
+        out[part + "A"] = scale * jax.random.normal(keys[4 * j + 0], (in_ch, rank), F)
+        out[part + "B"] = scale * jax.random.normal(keys[4 * j + 1], (out_ch, rank), F)
+        out[part + "C"] = scale * jax.random.normal(keys[4 * j + 2], (n_modes, rank), F)
+        out[part + "D"] = scale * jax.random.normal(keys[4 * j + 3], (n_modes // 2, rank), F)
+    return out
+
+
+def init_fno_cp(key, in_ch, out_ch, channels, n_modes, n_layers, rank=8):
+    """init_fno with rank-R CP filters in place of the dense ones."""
+    tree = init_fno(key, in_ch, out_ch, channels, n_modes, n_layers)
+    filters = jax.random.split(jax.random.fold_in(key, 11), n_layers)
+    tree["blocks"] = [{**b, "filter": init_cp_weight(filters[i], channels, channels,
+                                                     n_modes, rank)}
+                      for i, b in enumerate(tree["blocks"])]
+    return tree

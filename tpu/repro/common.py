@@ -60,7 +60,11 @@ class Case:
         path = Paths.weight_file(self.label, engine)
         if not os.path.exists(path):
             return None
-        return model.load_params(path, channels=self.channels, n_modes=self.n_modes)
+        # F-FNO is a different parameterisation, so its checkpoint has to be poured back into
+        # its own skeleton rather than the dense one.
+        init = {"ffno": layers.init_fno_separable,
+                "tfno": layers.init_fno_cp}.get(engine)
+        return model.load_params(path, channels=self.channels, n_modes=self.n_modes, init=init)
 
     def __repr__(self):
         return f"<Case {self.label} C={self.channels} m={self.n_modes}>"
@@ -138,34 +142,48 @@ class Bench:
 
     @staticmethod
     def error(pred, y, loss="h1"):
-        """Relative error in `loss`, the metric that model was trained against."""
-        return float(layers.LOSSES[loss](jnp.asarray(pred), jnp.asarray(y)))
+        """Relative error in `loss`, the metric that model was trained against.
+
+        The loss functions reduce with a SUM over the batch, matching the torch objects the
+        training step is meant to reproduce.  A reported error has to be per sample, so the sum
+        is divided by the batch -- otherwise every number scales with the batch it was measured
+        on and is not comparable to anything.
+        """
+        pred, y = jnp.asarray(pred), jnp.asarray(y)
+        return float(layers.LOSSES[loss](pred, y)) / pred.shape[0]
 
     @staticmethod
     def errors(pred, y):
-        """Both relative metrics from one forward pass.
+        """Both relative metrics from one forward pass, per sample.
 
         The model is judged on the one it was trained for; the other is carried because the FNO
         literature reports relative L2 and a table with only H1 cannot be placed against it.
         """
         pred, y = jnp.asarray(pred), jnp.asarray(y)
-        return {"h1": float(layers.h1_rel(pred, y)), "l2": float(layers.lp_rel(pred, y))}
+        n = pred.shape[0]
+        return {"h1": float(layers.h1_rel(pred, y)) / n,
+                "l2": float(layers.lp_rel(pred, y)) / n}
 
     @staticmethod
     def h1(pred, y):
-        """Relative H1 error.  Kept for callers that want it by name."""
-        return float(layers.h1_rel(jnp.asarray(pred), jnp.asarray(y)))
+        """Relative H1 error per sample.  Kept for callers that want it by name."""
+        pred, y = jnp.asarray(pred), jnp.asarray(y)
+        return float(layers.h1_rel(pred, y)) / pred.shape[0]
 
     @staticmethod
-    def h1_chunked(forward, x, y, batch):
-        """H1 over a test split too large for one forward."""
-        num = den = 0.0
+    def errors_chunked(forward, x, y, batch):
+        """Both metrics over a test split too large for one forward.
+
+        Each chunk contributes its own per-sample sum, so the result is the same mean a single
+        forward over the whole split would give.
+        """
+        totals = {"h1": 0.0, "l2": 0.0}
         for start in range(0, x.shape[0], batch):
             pred = forward(jnp.asarray(x[start:start + batch]))
             ys = jnp.asarray(y[start:start + batch])
-            num += float(jnp.sum((pred - ys) ** 2))
-            den += float(jnp.sum(ys ** 2))
-        return float(np.sqrt(num / den))
+            totals["h1"] += float(layers.h1_rel(pred, ys))
+            totals["l2"] += float(layers.lp_rel(pred, ys))
+        return {k: v / x.shape[0] for k, v in totals.items()}
 
     @staticmethod
     def chain(rows, key="us_mean"):

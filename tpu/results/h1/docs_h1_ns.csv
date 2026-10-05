@@ -1,0 +1,2 @@
+case,loss,lr,lr_step,batch,epochs,rel_l2,train_s,weights
+NS-128,h1,0.0003,100,8,60,0.02737784333211415,2602.572303765,/tmp/h1w/NS-128_h1.npz

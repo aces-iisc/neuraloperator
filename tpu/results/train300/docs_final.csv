@@ -1,0 +1,89 @@
+part,case,config,dtype,batch,us_per_sample,loss,error,h1,l2,status
+A,Burgers,sweep,f32,1,164.67999921587761,l2,nan,nan,nan,ok
+A,Burgers,sweep,f32,2,96.65500056144083,l2,nan,nan,nan,ok
+A,Burgers,sweep,f32,4,56.127500101865735,l2,nan,nan,nan,ok
+A,Burgers,sweep,f32,8,37.30499997800507,l2,nan,nan,nan,ok
+A,Burgers,sweep,f32,16,26.394375026939088,l2,nan,nan,nan,ok
+A,Burgers,sweep,f32,32,17.025937495418475,l2,nan,nan,nan,ok
+A,Burgers,sweep,f32,64,8.220921870361053,l2,nan,nan,nan,ok
+A,Burgers,sweep,f32,128,4.1411718711970025,l2,nan,nan,nan,ok
+A,Burgers,sweep,f32,256,3.6044531199763696,l2,nan,nan,nan,ok
+A,Burgers,sweep,bf16,1,176.72000103630126,l2,nan,nan,nan,ok
+A,Burgers,sweep,bf16,2,87.80999996815808,l2,nan,nan,nan,ok
+A,Burgers,sweep,bf16,4,52.84250028125825,l2,nan,nan,nan,ok
+A,Burgers,sweep,bf16,8,32.68612499596202,l2,nan,nan,nan,ok
+A,Burgers,sweep,bf16,16,23.22312502656132,l2,nan,nan,nan,ok
+A,Burgers,sweep,bf16,32,14.526249970003846,l2,nan,nan,nan,ok
+A,Burgers,sweep,bf16,64,6.37951561088812,l2,nan,nan,nan,ok
+A,Burgers,sweep,bf16,128,3.1548437533501783,l2,nan,nan,nan,ok
+A,Burgers,sweep,bf16,256,2.8353476579923154,l2,nan,nan,nan,ok
+A,Darcy-32,sweep,f32,1,174.69000158598647,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,f32,2,107.67000003397698,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,f32,4,63.8200003777456,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,f32,8,45.221250047688955,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,f32,16,34.04568747100711,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,f32,32,31.79999998792482,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,f32,64,16.28984372814557,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,f32,128,8.196406255933653,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,f32,256,7.486796874900392,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,bf16,1,168.5699990048306,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,bf16,2,94.4795001487364,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,bf16,4,62.059999891062034,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,bf16,8,40.46375011057535,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,bf16,16,29.348124940042908,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,bf16,32,25.7824999607692,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,bf16,64,13.11421877403518,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,bf16,128,6.5867968856991865,h1,nan,nan,nan,ok
+A,Darcy-32,sweep,bf16,256,6.2373437472729165,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,f32,1,189.91999968420714,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,f32,2,123.054999676242,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,f32,4,81.52249984050286,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,f32,8,62.0212499597983,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,f32,16,52.16124998241867,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,f32,32,47.13531251354652,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,f32,64,44.30609374139749,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,f32,128,22.362187507951603,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,f32,256,27.856445314000666,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,bf16,1,168.20000018924475,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,bf16,2,103.55549966334365,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,bf16,4,69.05500003995257,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,bf16,8,52.449999884629506,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,bf16,16,43.864999952347716,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,bf16,32,40.31937498893967,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,bf16,64,40.86046877205263,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,bf16,128,20.485617184817784,h1,nan,nan,nan,ok
+A,Darcy-64,sweep,bf16,256,26.946324219068174,h1,nan,nan,nan,ok
+A,NS-128,sweep,f32,1,1180.809998913901,h1,nan,nan,nan,ok
+A,NS-128,sweep,f32,2,753.314499888802,h1,nan,nan,nan,ok
+A,NS-128,sweep,f32,4,521.4650000198162,h1,nan,nan,nan,ok
+A,NS-128,sweep,f32,8,405.9998750562954,h1,nan,nan,nan,ok
+A,NS-128,sweep,f32,16,450.481187499463,h1,nan,nan,nan,ok
+A,NS-128,sweep,f32,32,519.3027500354219,h1,nan,nan,nan,ok
+A,NS-128,sweep,f32,64,616.6682343859975,h1,nan,nan,nan,ok
+A,NS-128,sweep,f32,128,614.9178437482306,h1,nan,nan,nan,ok
+A,NS-128,sweep,f32,256,626.7881914041595,h1,nan,nan,nan,ok
+A,NS-128,sweep,bf16,1,1137.0299998816336,h1,nan,nan,nan,ok
+A,NS-128,sweep,bf16,2,410.0200003449572,h1,nan,nan,nan,ok
+A,NS-128,sweep,bf16,4,309.4550002060714,h1,nan,nan,nan,ok
+A,NS-128,sweep,bf16,8,333.45499991810357,h1,nan,nan,nan,ok
+A,NS-128,sweep,bf16,16,388.34118743125146,h1,nan,nan,nan,ok
+A,NS-128,sweep,bf16,32,483.6255937448186,h1,nan,nan,nan,ok
+A,NS-128,sweep,bf16,64,574.7546406382753,h1,nan,nan,nan,ok
+A,NS-128,sweep,bf16,128,590.3872109485064,h1,nan,nan,nan,ok
+A,NS-128,sweep,bf16,256,600.9348359370392,h1,nan,nan,nan,ok
+B,Burgers,"baseline (jnp.fft, B=128)",float32,128,4.775625001229855,l2,0.0010361403692513704,0.001712757667216162,0.0010361403692513704,ok
+B,Burgers,"baseline (jnp.fft, B*)",float32,256,4.432499999040829,l2,0.001035959110595286,0.0017082756385207176,0.001035959110595286,ok
+B,Burgers,ours f32 (B*),float32,256,3.572308592936224,l2,0.0011399633949622512,0.0018808851018548012,0.0011399633949622512,ok
+B,Burgers,ours bf16 (B*),bfloat16,256,2.8461328156481613,l2,0.002673601731657982,0.0052420529536902905,0.002673601731657982,ok
+B,Darcy-32,"baseline (jnp.fft, B=128)",float32,128,12.334999993868223,h1,0.11252975783177785,0.11252975783177785,0.07077647426298686,ok
+B,Darcy-32,"baseline (jnp.fft, B*)",float32,256,14.878476562785181,h1,0.1130090852578481,0.1130090852578481,0.07149125138918559,ok
+B,Darcy-32,ours f32 (B*),float32,256,7.506367182941176,h1,0.1130090927084287,0.1130090927084287,0.07149125387271245,ok
+B,Darcy-32,ours bf16 (B*),bfloat16,256,6.248281252396737,h1,0.11308405548334122,0.11308405548334122,0.07161556680997212,ok
+B,Darcy-64,"baseline (jnp.fft, B=128)",float32,128,66.45944530703218,h1,0.08694689933742795,0.08694689933742795,0.04669411001460893,ok
+B,Darcy-64,"baseline (jnp.fft, B*)",float32,128,66.50522655604618,h1,0.08694689933742795,0.08694689933742795,0.04669411001460893,ok
+B,Darcy-64,ours f32 (B*),float32,128,22.515539058076683,h1,0.08694688550063542,0.08694688550063542,0.046694133430719376,ok
+B,Darcy-64,ours bf16 (B*),bfloat16,128,20.65445312382508,h1,0.08698362218482154,0.08698362218482154,0.046568788055862696,ok
+B,NS-128,"baseline (jnp.fft, B=128)",float32,128,1327.8284062607781,h1,0.35975078493356705,0.35975078493356705,0.12149843573570251,ok
+B,NS-128,"baseline (jnp.fft, B*)",float32,8,793.1861250654038,h1,0.35975079564377666,0.35975079564377666,0.12149842921644449,ok
+B,NS-128,ours f32 (B*),float32,8,407.7250000591448,h1,0.3596836947835982,0.3596836947835982,0.12135118956211954,ok
+B,NS-128,ours bf16 (B*),bfloat16,4,313.6777500003518,h1,0.3600046271458268,0.3600046271458268,0.12144715589238331,ok

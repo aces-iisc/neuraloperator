@@ -1,0 +1,15 @@
+probe,case,variant,wall_us,per_elem_ns,hbm_mb,status
+lanes,W=16,gelu+mul+add,245.11000000870808,0.02921938896283008,nan,ok
+lanes,W=32,gelu+mul+add,234.7799999995459,0.02798795700067829,nan,ok
+lanes,W=64,gelu+mul+add,212.9799999863735,0.02538919448690099,nan,ok
+lanes,W=128,gelu+mul+add,237.60000001971093,0.02832412719961535,nan,ok
+lanes,W=256,gelu+mul+add,232.40999999529777,0.02770543098393652,nan,ok
+channels,Darcy-32,C=24,340.88999998971303,nan,351.866368,ok
+channels,Darcy-32,C=32,446.6500000148699,nan,456.846848,ok
+channels,NS-128,C=64,3192.690000020093,nan,3800.11264,ok
+addgrid,Darcy-32,rebuilt,348.87999999000385,nan,351.866368,ok
+addgrid,Darcy-32,passed in,347.15999998979896,nan,351.98976,ok
+addgrid,NS-128,rebuilt,3195.8499999973355,nan,3800.11264,ok
+addgrid,NS-128,passed in,3214.3800000028477,nan,3800.629248,ok
+hbm,Darcy-32,full forward,nan,nan,351.866368,io=0.066 ws=0.79
+hbm,NS-128,full forward,nan,nan,3800.11264,io=1.049 ws=33.55

@@ -39,6 +39,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from ...fft.rfft1d import rfft_full as fft_reim, rfft_half
+from .xplane_mini import _hlo_bucket
 from ..fft.tricks import (
     jax_rfft_int8,
     rfft_coupled,
@@ -367,30 +368,6 @@ def profile(engines=None, case=None, Ns=(1024,), K=256, logdir="/tmp/tpu_prof", 
 def _bar(frac, width=28):
     frac = max(0.0, min(1.0, frac))
     return "█" * round(frac * width) + "·" * (width - round(frac * width))
-
-
-def _hlo_bucket(cat):
-    """Roll XLA's REAL `hlo_category` up into MXU/VPU/copy/DMA/custom (the ONE bucket list).
-    e.g. 'convolution fusion'->MXU (our einsum-DFT), 'loop/custom fusion'->VPU,
-    'slice'/'data formatting'/'reverse'->copy, 'copy-done'->DMA.  Category strings come from the
-    `hlo_category` XStat on /device:TPU:0 of the *.xplane.pb (xprof — https://openxla.org/xprof;
-    proto tensorflow.tsl.profiler.protobuf.xplane_pb2); the labels are XLA's, the roll-up is ours."""
-    c = cat.lower()
-    if not c:
-        return "other"
-    if "convolution" in c or "dot" in c or "gemm" in c:
-        return "MXU matmul"
-    if c in ("copy-start", "copy-done") or any(k in c for k in
-                                               ("all-reduce", "infeed", "outfeed", "dma")):
-        return "DMA / HBM"
-    if "custom-call" in c:
-        return "custom-call (fft)"
-    if "fusion" in c:  # loop/custom/input/output fusion -> VPU element-wise (incl. gather_fusion)
-        return "VPU / fusion"
-    if any(k in c for k in ("slice", "data formatting", "reverse", "transpose", "copy",
-                            "broadcast", "gather", "concatenate", "pad", "reshape", "bitcast")):
-        return "reshape / copy"
-    return c  # keep XLA's own label for anything unmapped
 
 
 def _rv(b, i):  # read one protobuf varint at byte i -> (value, next_i)

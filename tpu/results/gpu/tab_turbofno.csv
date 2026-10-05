@@ -1,0 +1,121 @@
+variant,label,bs,grid,in_ch,out_ch,ms,us_per_sample,status
+2D_A,fft + cgemm + ifft,1,128,24,24,0.09,90.0,ok
+2D_A,fft + cgemm + ifft,1,128,64,24,0.14,140.0,ok
+2D_A,fft + cgemm + ifft,1,128,24,64,0.128,128.0,ok
+2D_A,fft + cgemm + ifft,1,128,64,64,0.18,180.0,ok
+2D_A,fft + cgemm + ifft,8,128,24,24,0.531,66.375,ok
+2D_A,fft + cgemm + ifft,8,128,64,24,0.958,119.75,ok
+2D_A,fft + cgemm + ifft,8,128,24,64,0.915,114.375,ok
+2D_A,fft + cgemm + ifft,8,128,64,64,1.34,167.5,ok
+2D_A,fft + cgemm + ifft,16,128,24,24,1.118,69.875,ok
+2D_A,fft + cgemm + ifft,16,128,64,24,1.933,120.8125,ok
+2D_A,fft + cgemm + ifft,16,128,24,64,1.863,116.4375,ok
+2D_A,fft + cgemm + ifft,16,128,64,64,2.674,167.125,ok
+2D_A,fft + cgemm + ifft,32,128,24,24,2.259,70.59375,ok
+2D_A,fft + cgemm + ifft,32,128,64,24,3.846,120.1875,ok
+2D_A,fft + cgemm + ifft,32,128,24,64,3.747,117.09375,ok
+2D_A,fft + cgemm + ifft,32,128,64,64,5.337,166.78125,ok
+2D_A,fft + cgemm + ifft,64,128,24,24,4.512,70.5,ok
+2D_A,fft + cgemm + ifft,64,128,64,24,7.751,121.109375,ok
+2D_A,fft + cgemm + ifft,64,128,24,64,7.487,116.984375,ok
+2D_A,fft + cgemm + ifft,64,128,64,64,10.598,165.59375,ok
+2D_A,fft + cgemm + ifft,128,128,24,24,8.957,69.9765625,ok
+2D_A,fft + cgemm + ifft,128,128,64,24,15.377,120.1328125,ok
+2D_A,fft + cgemm + ifft,128,128,24,64,14.743,115.1796875,ok
+2D_A,fft + cgemm + ifft,128,128,64,64,21.009,164.1328125,ok
+2D_B,fused fft-cgemm + ifft,1,128,24,24,0.086,86.0,ok
+2D_B,fused fft-cgemm + ifft,1,128,64,24,0.134,134.0,ok
+2D_B,fused fft-cgemm + ifft,1,128,24,64,0.125,125.0,ok
+2D_B,fused fft-cgemm + ifft,1,128,64,64,0.173,173.0,ok
+2D_B,fused fft-cgemm + ifft,8,128,24,24,0.548,68.5,ok
+2D_B,fused fft-cgemm + ifft,8,128,64,24,0.992,124.0,ok
+2D_B,fused fft-cgemm + ifft,8,128,24,64,0.923,115.375,ok
+2D_B,fused fft-cgemm + ifft,8,128,64,64,1.373,171.625,ok
+2D_B,fused fft-cgemm + ifft,16,128,24,24,1.127,70.4375,ok
+2D_B,fused fft-cgemm + ifft,16,128,64,24,1.986,124.125,ok
+2D_B,fused fft-cgemm + ifft,16,128,24,64,1.868,116.75,ok
+2D_B,fused fft-cgemm + ifft,16,128,64,64,2.731,170.6875,ok
+2D_B,fused fft-cgemm + ifft,32,128,24,24,2.25,70.3125,ok
+2D_B,fused fft-cgemm + ifft,32,128,64,24,3.973,124.15625,ok
+2D_B,fused fft-cgemm + ifft,32,128,24,64,3.74,116.875,ok
+2D_B,fused fft-cgemm + ifft,32,128,64,64,5.461,170.65625,ok
+2D_B,fused fft-cgemm + ifft,64,128,24,24,4.482,70.03125,ok
+2D_B,fused fft-cgemm + ifft,64,128,64,24,8.017,125.26562499999999,ok
+2D_B,fused fft-cgemm + ifft,64,128,24,64,7.317,114.328125,ok
+2D_B,fused fft-cgemm + ifft,64,128,64,64,10.745,167.890625,ok
+2D_B,fused fft-cgemm + ifft,128,128,24,24,8.887,69.4296875,ok
+2D_B,fused fft-cgemm + ifft,128,128,64,24,15.571,121.6484375,ok
+2D_B,fused fft-cgemm + ifft,128,128,24,64,14.564,113.78125,ok
+2D_B,fused fft-cgemm + ifft,128,128,64,64,21.193,165.5703125,ok
+2D_C,fft + fused cgemm-ifft,1,128,24,24,0.107,107.0,ok
+2D_C,fft + fused cgemm-ifft,1,128,64,24,0.162,162.0,ok
+2D_C,fft + fused cgemm-ifft,1,128,24,64,0.137,137.0,ok
+2D_C,fft + fused cgemm-ifft,1,128,64,64,0.19,190.0,ok
+2D_C,fft + fused cgemm-ifft,8,128,24,24,0.647,80.875,ok
+2D_C,fft + fused cgemm-ifft,8,128,64,24,1.119,139.875,ok
+2D_C,fft + fused cgemm-ifft,8,128,24,64,0.905,113.125,ok
+2D_C,fft + fused cgemm-ifft,8,128,64,64,1.375,171.875,ok
+2D_C,fft + fused cgemm-ifft,16,128,24,24,1.261,78.8125,ok
+2D_C,fft + fused cgemm-ifft,16,128,64,24,2.203,137.6875,ok
+2D_C,fft + fused cgemm-ifft,16,128,24,64,1.795,112.1875,ok
+2D_C,fft + fused cgemm-ifft,16,128,64,64,2.72,170.0,ok
+2D_C,fft + fused cgemm-ifft,32,128,24,24,2.502,78.1875,ok
+2D_C,fft + fused cgemm-ifft,32,128,64,24,4.38,136.875,ok
+2D_C,fft + fused cgemm-ifft,32,128,24,64,3.538,110.5625,ok
+2D_C,fft + fused cgemm-ifft,32,128,64,64,5.408,169.0,ok
+2D_C,fft + fused cgemm-ifft,64,128,24,24,4.985,77.890625,ok
+2D_C,fft + fused cgemm-ifft,64,128,64,24,8.799,137.484375,ok
+2D_C,fft + fused cgemm-ifft,64,128,24,64,7.051,110.171875,ok
+2D_C,fft + fused cgemm-ifft,64,128,64,64,10.86,169.6875,ok
+2D_C,fft + fused cgemm-ifft,128,128,24,24,9.778,76.390625,ok
+2D_C,fft + fused cgemm-ifft,128,128,64,24,17.345,135.5078125,ok
+2D_C,fft + fused cgemm-ifft,128,128,24,64,13.81,107.890625,ok
+2D_C,fft + fused cgemm-ifft,128,128,64,64,21.157,165.2890625,ok
+2D_D,fully fused,1,128,24,24,0.095,95.0,ok
+2D_D,fully fused,1,128,64,24,0.152,152.0,ok
+2D_D,fully fused,1,128,24,64,0.124,124.0,ok
+2D_D,fully fused,1,128,64,64,0.183,183.0,ok
+2D_D,fully fused,8,128,24,24,0.639,79.875,ok
+2D_D,fully fused,8,128,64,24,1.119,139.875,ok
+2D_D,fully fused,8,128,24,64,0.894,111.75,ok
+2D_D,fully fused,8,128,64,64,1.377,172.125,ok
+2D_D,fully fused,16,128,24,24,1.259,78.6875,ok
+2D_D,fully fused,16,128,64,24,2.216,138.5,ok
+2D_D,fully fused,16,128,24,64,1.775,110.9375,ok
+2D_D,fully fused,16,128,64,64,2.732,170.75,ok
+2D_D,fully fused,32,128,24,24,2.499,78.09375,ok
+2D_D,fully fused,32,128,64,24,4.418,138.0625,ok
+2D_D,fully fused,32,128,24,64,3.534,110.4375,ok
+2D_D,fully fused,32,128,64,64,5.451,170.34375,ok
+2D_D,fully fused,64,128,24,24,4.982,77.84375,ok
+2D_D,fully fused,64,128,64,24,8.851,138.296875,ok
+2D_D,fully fused,64,128,24,64,6.974,108.96875,ok
+2D_D,fully fused,64,128,64,64,10.717,167.453125,ok
+2D_D,fully fused,128,128,24,24,9.743,76.1171875,ok
+2D_D,fully fused,128,128,64,24,17.415,136.0546875,ok
+2D_D,fully fused,128,128,24,64,13.719,107.1796875,ok
+2D_D,fully fused,128,128,64,64,21.419,167.3359375,ok
+2D_E,cuFFT + cuBLAS baseline,1,128,24,24,0.068,68.0,ok
+2D_E,cuFFT + cuBLAS baseline,1,128,64,24,0.084,84.0,ok
+2D_E,cuFFT + cuBLAS baseline,1,128,24,64,0.085,85.0,ok
+2D_E,cuFFT + cuBLAS baseline,1,128,64,64,0.109,109.0,ok
+2D_E,cuFFT + cuBLAS baseline,8,128,24,24,0.291,36.375,ok
+2D_E,cuFFT + cuBLAS baseline,8,128,64,24,0.74,92.5,ok
+2D_E,cuFFT + cuBLAS baseline,8,128,24,64,0.803,100.375,ok
+2D_E,cuFFT + cuBLAS baseline,8,128,64,64,1.359,169.875,ok
+2D_E,cuFFT + cuBLAS baseline,16,128,24,24,1.172,73.25,ok
+2D_E,cuFFT + cuBLAS baseline,16,128,64,24,1.781,111.3125,ok
+2D_E,cuFFT + cuBLAS baseline,16,128,24,64,2.056,128.5,ok
+2D_E,cuFFT + cuBLAS baseline,16,128,64,64,2.769,173.0625,ok
+2D_E,cuFFT + cuBLAS baseline,32,128,24,24,1.911,59.71875,ok
+2D_E,cuFFT + cuBLAS baseline,32,128,64,24,3.356,104.875,ok
+2D_E,cuFFT + cuBLAS baseline,32,128,24,64,3.848,120.25,ok
+2D_E,cuFFT + cuBLAS baseline,32,128,64,64,5.5,171.875,ok
+2D_E,cuFFT + cuBLAS baseline,64,128,24,24,3.849,60.140625,ok
+2D_E,cuFFT + cuBLAS baseline,64,128,64,24,6.71,104.84375,ok
+2D_E,cuFFT + cuBLAS baseline,64,128,24,64,7.683,120.046875,ok
+2D_E,cuFFT + cuBLAS baseline,64,128,64,64,11.138,174.03125,ok
+2D_E,cuFFT + cuBLAS baseline,128,128,24,24,7.734,60.421875,ok
+2D_E,cuFFT + cuBLAS baseline,128,128,24,64,,,cublas_status_14
+2D_E,cuFFT + cuBLAS baseline,128,128,64,24,,,cublas_status_14
+2D_E,cuFFT + cuBLAS baseline,128,128,64,64,,,cublas_status_14

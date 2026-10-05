@@ -1,0 +1,4 @@
+case,loss,lr,lr_step,batch,epochs,rel_l2,train_s,weights
+Burgers,l2,0.0001,60,16,60,0.003994072375115768,19.192968431999986,/tmp/h1w/Burgers_h1.npz
+Darcy-32,h1,0.005,60,8,60,0.07201980837558929,80.16245252100003,/tmp/h1w/Darcy-32_h1.npz
+Darcy-64,h1,0.005,60,8,60,0.05052896959821733,109.98694455500004,/tmp/h1w/Darcy-64_h1.npz
