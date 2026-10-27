@@ -1,0 +1,81 @@
+batch,bucket,case,impl,launches,pct,us_per_call
+396,tensor-core / GEMM,Burgers,ours torch,35,30.52571209265176,1422.7824999999993
+396,other,Burgers,ours torch,41,27.935478732855792,1302.0534999999945
+396,copy / relayout,Burgers,ours torch,62,24.899860143833084,1160.5653999999984
+396,elementwise / fusion,Burgers,ours torch,76,16.63894903065939,775.5299999999971
+396,cuFFT,Burgers,native torch,24,24.4975492481783,605.4985999999977
+396,elementwise / fusion,Burgers,native torch,60,24.144710898109036,596.7776000000024
+396,tensor-core / GEMM,Burgers,native torch,23,20.08186286673126,496.3573999999993
+396,copy / relayout,Burgers,native torch,38,16.39693743918332,405.27819999999974
+396,other,Burgers,native torch,21,13.084844939460217,323.41420000000124
+396,DMA / memcpy,Burgers,native torch,4,1.7940946083378808,44.3440999999995
+396,elementwise / fusion,Burgers,their torch m=22 (published),117,28.02496549673991,1242.5258000000063
+396,copy / relayout,Burgers,their torch m=22 (published),61,21.43130281919657,950.1866000000002
+396,tensor-core / GEMM,Burgers,their torch m=22 (published),23,21.266079624434877,942.8611999999997
+396,other,Burgers,their torch m=22 (published),17,16.638314486136533,737.6828000000002
+396,cuFFT,Burgers,their torch m=22 (published),28,12.639337573492119,560.382600000001
+396,elementwise / fusion,Burgers,their torch m=15 (band-matched),117,28.951467867607967,1243.7058999999979
+396,tensor-core / GEMM,Burgers,their torch m=15 (band-matched),23,20.8217913268546,894.4688
+396,copy / relayout,Burgers,their torch m=15 (band-matched),61,19.999950184250807,859.163900000001
+396,other,Burgers,their torch m=15 (band-matched),17,17.15455606229501,736.9305999999993
+396,cuFFT,Burgers,their torch m=15 (band-matched),28,13.072234558991598,561.5609999999974
+128,copy / relayout,Darcy-32,ours torch,62,28.162706981042277,963.4721999999977
+128,other,Darcy-32,ours torch,41,24.902163557528095,851.9259999999979
+128,tensor-core / GEMM,Darcy-32,ours torch,35,24.68792496478391,844.5966999999982
+128,elementwise / fusion,Darcy-32,ours torch,76,22.247204496645708,761.0973999999983
+128,elementwise / fusion,Darcy-32,native torch,60,30.5426649552619,741.4169000000029
+128,cuFFT,Darcy-32,native torch,24,27.84279034458538,675.8780000000003
+128,tensor-core / GEMM,Darcy-32,native torch,23,16.85929034042473,409.2558000000009
+128,other,Darcy-32,native torch,21,15.114715288624083,366.9066000000007
+128,copy / relayout,Darcy-32,native torch,38,8.056570943506188,195.57159999999865
+128,DMA / memcpy,Darcy-32,native torch,4,1.5839681275977024,38.4505
+128,elementwise / fusion,Darcy-32,their torch m=22 (published),117,34.326842508176014,1487.2650999999998
+128,copy / relayout,Darcy-32,their torch m=22 (published),61,21.42923449875768,928.455699999999
+128,cuFFT,Darcy-32,their torch m=22 (published),28,15.765440309729433,683.0628000000012
+128,tensor-core / GEMM,Darcy-32,their torch m=22 (published),23,15.368268522019962,665.8547000000023
+128,other,Darcy-32,their torch m=22 (published),17,13.110214161316918,568.0209000000007
+128,elementwise / fusion,Darcy-32,their torch m=15 (band-matched),117,36.64801390434742,1487.433599999999
+128,copy / relayout,Darcy-32,their torch m=15 (band-matched),61,17.700250853610427,718.4004000000016
+128,cuFFT,Darcy-32,their torch m=15 (band-matched),28,16.81807714969354,682.5956000000003
+128,tensor-core / GEMM,Darcy-32,their torch m=15 (band-matched),23,14.841275109198682,602.3630999999989
+128,other,Darcy-32,their torch m=15 (band-matched),17,13.992382983149907,567.909099999999
+32,copy / relayout,Darcy-64,ours torch,62,27.24400073041116,751.6604000000013
+32,elementwise / fusion,Darcy-64,ours torch,76,25.62170663497587,706.9013999999994
+32,other,Darcy-64,ours torch,41,24.101917285654306,664.9704999999997
+32,tensor-core / GEMM,Darcy-64,ours torch,35,23.032375348958677,635.4618999999996
+32,elementwise / fusion,Darcy-64,native torch,60,33.693931765367594,731.6642000000008
+32,cuFFT,Darcy-64,native torch,24,25.790579734371825,560.0427999999995
+32,tensor-core / GEMM,Darcy-64,native torch,23,17.034651693063616,369.90769999999947
+32,other,Darcy-64,native torch,21,16.99441225319954,369.0338999999989
+32,copy / relayout,Darcy-64,native torch,38,4.785610545772548,103.91959999999835
+32,DMA / memcpy,Darcy-64,native torch,4,1.700814008224893,36.9331999999996
+32,elementwise / fusion,Darcy-64,their torch m=22 (published),117,37.91536078406194,1468.3844999999972
+32,copy / relayout,Darcy-64,their torch m=22 (published),61,18.439781927051254,714.1350999999997
+32,tensor-core / GEMM,Darcy-64,their torch m=22 (published),23,14.992760527162348,580.639000000001
+32,other,Darcy-64,their torch m=22 (published),17,14.684972546190037,568.7190000000006
+32,cuFFT,Darcy-64,their torch m=22 (published),28,13.967124215534387,540.9181999999985
+32,elementwise / fusion,Darcy-64,their torch m=15 (band-matched),117,38.7632486116936,1469.997900000002
+32,copy / relayout,Darcy-64,their torch m=15 (band-matched),61,17.148661542667714,650.3195000000017
+32,other,Darcy-64,their torch m=15 (band-matched),17,14.968452471864676,567.6406
+32,tensor-core / GEMM,Darcy-64,their torch m=15 (band-matched),23,14.852410434089938,563.2400000000007
+32,cuFFT,Darcy-64,their torch m=15 (band-matched),28,14.267226939684091,541.0484000000008
+4,tensor-core / GEMM,NS-128,ours torch,35,44.25981357434001,2852.3043000000057
+4,copy / relayout,NS-128,ours torch,62,18.74789218056905,1208.1997000000013
+4,elementwise / fusion,NS-128,ours torch,76,18.709746215669927,1205.7414000000097
+4,other,NS-128,ours torch,41,18.282548029421015,1178.2108000000042
+4,elementwise / fusion,NS-128,native torch,60,33.668942490010394,2028.153999999999
+4,tensor-core / GEMM,NS-128,native torch,23,22.54853180525568,1358.281299999999
+4,other,NS-128,native torch,21,21.392909865755104,1288.6687999999988
+4,cuFFT,NS-128,native torch,24,15.390545183958746,927.0975999999998
+4,copy / relayout,NS-128,native torch,38,5.557938505590307,334.7998000000006
+4,DMA / memcpy,NS-128,native torch,4,1.4411321494297504,86.8111000000001
+4,copy / relayout,NS-128,their torch m=78 (published),61,54.06961443429641,6365.336599999994
+4,elementwise / fusion,NS-128,their torch m=78 (published),117,19.017208586007907,2238.7977999999853
+4,tensor-core / GEMM,NS-128,their torch m=78 (published),23,16.623700089525776,1957.022400000004
+4,cuFFT,NS-128,their torch m=78 (published),28,5.1974843235715324,611.8729999999971
+4,other,NS-128,their torch m=78 (published),17,5.091992566598383,599.4539999999977
+4,copy / relayout,NS-128,their torch m=63 (band-matched),61,47.58750673611641,4457.189499999987
+4,elementwise / fusion,NS-128,their torch m=63 (band-matched),117,23.939652467743507,2242.260100000002
+4,tensor-core / GEMM,NS-128,their torch m=63 (band-matched),23,15.537502752687317,1455.2894
+4,cuFFT,NS-128,their torch m=63 (band-matched),28,6.530784647575609,611.6929999999971
+4,other,NS-128,their torch m=63 (band-matched),17,6.404553395877163,599.869800000003

@@ -1,0 +1,13 @@
+engine,case,grid,variant,batch,params,us_per_sample,rel_l2,status,trace
+baseline+opt,Burgers,16,dense,32,0,nan,nan,ValueError,
+baseline+opt,Burgers,16,ffno,32,0,nan,nan,ValueError,
+baseline+opt,Burgers,16,tfno,32,0,nan,nan,TypeError,
+baseline+opt,Darcy-32,32,dense,32,2364313,58.84156249980066,0.09684421122074127,ok,baseline+opt_Darcy-32_dense
+baseline+opt,Darcy-32,32,ffno,32,299929,58.3106249987253,0.07599736750125885,ok,baseline+opt_Darcy-32_ffno
+baseline+opt,Darcy-32,32,tfno,32,10137,54.808750000745476,0.08568590134382248,ok,baseline+opt_Darcy-32_tfno
+baseline+opt,Darcy-64,64,dense,32,2364313,109.83968750011286,0.08252029120922089,ok,baseline+opt_Darcy-64_dense
+baseline+opt,Darcy-64,64,ffno,32,299929,110.60156250408681,0.058707091957330704,ok,baseline+opt_Darcy-64_ffno
+baseline+opt,Darcy-64,64,tfno,32,10137,113.09840624562639,0.07524418830871582,ok,baseline+opt_Darcy-64_tfno
+baseline+opt,NS-128,128,dense,4,268469313,990.7649999831847,0.6099062561988831,ok,baseline+opt_NS-128_dense
+baseline+opt,NS-128,128,ffno,4,8422465,672.5700000060897,0.6292634010314941,ok,baseline+opt_NS-128_ffno
+baseline+opt,NS-128,128,tfno,4,50241,695.5950000246958,0.6642675399780273,ok,baseline+opt_NS-128_tfno

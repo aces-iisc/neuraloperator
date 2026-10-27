@@ -1,0 +1,87 @@
+
+==============================================================================
+RTX 5070   (radix 16, K = 256)
+==============================================================================
+
+-- band: where a packing scheme beats reim ----------------------------------
+   N=2048   num_modes=2048   reduced  1.194x faster than reim
+   N=4096   num_modes=1024   reduced  1.231x faster than reim
+   N=4096   num_modes=2048   reduced  1.106x faster than reim
+   N=4096   num_modes=4096   reduced  1.200x faster than reim
+   (4 of 72 cells)
+
+-- staged, full non-redundant spectrum ---------------------------------------
+        N    winner   margin          reim plan     reduced plan   leaf rule
+       16      reim    3.60x      0 st, leaf 16     0 st, leaf 8   -
+       32      reim    1.03x       1 st, leaf 2    0 st, leaf 16   reduced: starved leaf repaired
+       64      reim    1.93x       1 st, leaf 4     1 st, leaf 2   -
+      128      reim    2.07x       1 st, leaf 8     1 st, leaf 4   -
+      256      reim    1.77x      1 st, leaf 16     1 st, leaf 8   -
+      512   reduced    2.63x       2 st, leaf 2    1 st, leaf 16   reduced: starved leaf repaired
+     1024   coupled    1.14x       2 st, leaf 4     2 st, leaf 2   -
+     2048   coupled    1.16x       2 st, leaf 8     2 st, leaf 4   -
+     4096   coupled    1.23x      2 st, leaf 16     2 st, leaf 8   -
+
+-- against the vendor library ------------------------------------------------
+        N  largest num_modes where the restricted matrix still wins
+       16  none
+       32  none
+       64  none
+      128  none
+      256  none
+      512  none
+     1024  2  (of 1024)
+     2048  128  (of 2048)
+     4096  128  (of 4096)
+
+==============================================================================
+TPU v5e   (radix 128, K = 256)
+==============================================================================
+
+-- band: where a packing scheme beats reim ----------------------------------
+   N=256    num_modes=256    reduced  1.192x faster than reim
+   N=512    num_modes=256    reduced  1.168x faster than reim
+   N=512    num_modes=512    reduced  1.278x faster than reim
+   N=1024   num_modes=128    reduced  1.062x faster than reim
+   N=1024   num_modes=256    reduced  1.216x faster than reim
+   N=1024   num_modes=512    reduced  1.435x faster than reim
+   N=1024   num_modes=1024   reduced  1.418x faster than reim
+   N=2048   num_modes=128    reduced  1.141x faster than reim
+   N=2048   num_modes=256    reduced  1.273x faster than reim
+   N=2048   num_modes=512    reduced  1.420x faster than reim
+   N=2048   num_modes=1024   reduced  1.497x faster than reim
+   N=2048   num_modes=2048   reduced  1.372x faster than reim
+   N=4096   num_modes=2      coupled  1.022x faster than reim
+   N=4096   num_modes=4      coupled  1.059x faster than reim
+   N=4096   num_modes=64     reduced  1.006x faster than reim
+   N=4096   num_modes=128    reduced  1.206x faster than reim
+   N=4096   num_modes=256    reduced  1.308x faster than reim
+   N=4096   num_modes=512    reduced  1.528x faster than reim
+   N=4096   num_modes=1024   reduced  1.387x faster than reim
+   N=4096   num_modes=2048   reduced  1.389x faster than reim
+   N=4096   num_modes=4096   reduced  1.526x faster than reim
+   (21 of 72 cells)
+
+-- staged, full non-redundant spectrum ---------------------------------------
+        N    winner   margin          reim plan     reduced plan   leaf rule
+       16      reim    1.80x      0 st, leaf 16     0 st, leaf 8   -
+       32      reim    1.98x      0 st, leaf 32    0 st, leaf 16   -
+       64      reim    1.98x      0 st, leaf 64    0 st, leaf 32   -
+      128      reim    2.12x     0 st, leaf 128    0 st, leaf 64   -
+      256   reduced    1.86x       1 st, leaf 2   0 st, leaf 128   reduced: starved leaf repaired
+      512   coupled    1.14x       1 st, leaf 4     1 st, leaf 2   -
+     1024      reim    1.13x       1 st, leaf 8     1 st, leaf 4   -
+     2048   coupled    1.04x      1 st, leaf 16     1 st, leaf 8   -
+     4096      reim    1.10x      1 st, leaf 32    1 st, leaf 16   -
+
+-- against the vendor library ------------------------------------------------
+        N  largest num_modes where the restricted matrix still wins
+       16  16  (of 16)
+       32  32  (of 32)
+       64  64  (of 64)
+      128  128  (of 128)
+      256  256  (of 256)
+      512  256  (of 512)
+     1024  256  (of 1024)
+     2048  256  (of 2048)
+     4096  256  (of 4096)

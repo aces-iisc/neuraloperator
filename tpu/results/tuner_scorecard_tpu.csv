@@ -1,0 +1,17 @@
+target,case,dtype,b_form,b_pick,b_best,cost_form,cost_pick,form_swept,offered
+TPU v5e,Burgers,bfloat16,128,384,384,1.07423,1.00000,1,1
+TPU v5e,Burgers,float32,128,384,384,1.04623,1.00000,1,1
+TPU v5e,Darcy-32,bfloat16,128,384,384,1.00337,1.00000,1,1
+TPU v5e,Darcy-32,float32,128,256,256,1.01703,1.00000,1,1
+TPU v5e,Darcy-64,bfloat16,113,128,128,,1.00000,0,1
+TPU v5e,Darcy-64,float32,113,128,128,,1.00000,0,1
+TPU v5e,NS-128,bfloat16,10,4,4,1.17983,1.00000,1,1
+TPU v5e,NS-128,float32,10,8,8,1.07725,1.00000,1,1
+TPU v6e,Burgers,bfloat16,128,384,384,1.09939,1.00000,1,1
+TPU v6e,Burgers,float32,128,384,384,1.09873,1.00000,1,1
+TPU v6e,Darcy-32,bfloat16,128,128,128,1.00000,1.00000,1,1
+TPU v6e,Darcy-32,float32,128,128,128,1.00000,1.00000,1,1
+TPU v6e,Darcy-64,bfloat16,113,128,128,,1.00000,0,1
+TPU v6e,Darcy-64,float32,113,128,128,,1.00000,0,1
+TPU v6e,NS-128,bfloat16,10,8,3,1.07336,1.00562,1,0
+TPU v6e,NS-128,float32,10,12,12,1.04971,1.00000,1,1

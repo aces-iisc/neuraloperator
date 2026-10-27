@@ -1,0 +1,22 @@
+gen  case      dtype      B form  B pick  B best     form     pick   offered
+--------------------------------------------------------------------------------------
+v5e  Burgers   bfloat16      128     384     384   1.074x   1.000x       yes
+v5e  Burgers   float32       128     384     384   1.046x   1.000x       yes
+v5e  Darcy-32  bfloat16      128     384     384   1.003x   1.000x       yes
+v5e  Darcy-32  float32       128     256     256   1.017x   1.000x       yes
+v5e  Darcy-64  bfloat16      113     128     128      n/a   1.000x       yes
+v5e  Darcy-64  float32       113     128     128      n/a   1.000x       yes
+v5e  NS-128    bfloat16       10       4       4   1.180x   1.000x       yes
+v5e  NS-128    float32        10       8       8   1.077x   1.000x       yes
+v6e  Burgers   bfloat16      128     384     384   1.099x   1.000x       yes
+v6e  Burgers   float32       128     384     384   1.099x   1.000x       yes
+v6e  Darcy-32  bfloat16      128     128     128   1.000x   1.000x       yes
+v6e  Darcy-32  float32       128     128     128   1.000x   1.000x       yes
+v6e  Darcy-64  bfloat16      113     128     128      n/a   1.000x       yes
+v6e  Darcy-64  float32       113     128     128      n/a   1.000x       yes
+v6e  NS-128    bfloat16       10       8       3   1.073x   1.006x        NO
+v6e  NS-128    float32        10      12      12   1.050x   1.000x       yes
+--------------------------------------------------------------------------------------
+closed form exact      2/16   worst cost 1.180x
+ladder pick exact      15/16   worst cost 1.006x
+optimum on the ladder  15/16

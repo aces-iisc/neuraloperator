@@ -1,0 +1,13 @@
+target,case,dtype,sweep,b_form,b_pick,b_best,cost_form,cost_pick,form_swept,offered
+NVIDIA GeForce RTX 5070,Burgers,bfloat16,gpu_sweep.csv,592,453,453,1.04863,1.00000,1,1
+NVIDIA GeForce RTX 5070,Burgers,float32,gpu_sweep.csv,592,453,444,1.06825,1.00568,1,0
+NVIDIA GeForce RTX 5070,Darcy-32,bfloat16,gpu_sweep.csv,160,170,170,1.01334,1.00000,1,1
+NVIDIA GeForce RTX 5070,Darcy-32,float32,gpu_sweep.csv,160,170,160,1.00000,1.00707,1,0
+NVIDIA GeForce RTX 5070,Darcy-64,bfloat16,gpu_sweep.csv,32,32,44,1.00177,1.00177,1,0
+NVIDIA GeForce RTX 5070,Darcy-64,float32,gpu_sweep.csv,32,32,40,1.00473,1.00473,1,0
+NVIDIA GeForce RTX 5070,NS-128,bfloat16,gpu_sweep.csv,4,4,4,1.00000,1.00000,1,1
+NVIDIA GeForce RTX 5070,NS-128,float32,gpu_sweep.csv,4,4,6,1.00939,1.00939,1,0
+NVIDIA GeForce RTX 5070,Burgers,float32,sweep_pair.csv,592,453,444,1.07683,1.02563,1,0
+NVIDIA GeForce RTX 5070,Darcy-32,float32,sweep_pair.csv,160,170,140,1.02546,1.02985,1,0
+NVIDIA GeForce RTX 5070,Darcy-64,float32,sweep_pair.csv,32,32,32,1.00000,1.00000,1,1
+NVIDIA GeForce RTX 5070,NS-128,float32,sweep_pair.csv,4,4,4,1.00000,1.00000,1,1

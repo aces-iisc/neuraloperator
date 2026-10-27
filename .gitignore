@@ -115,3 +115,8 @@ tpu/experimental/hlo_vmem/*.entry.txt
 tpu/results/**/weights/
 tpu/results/**/traces*/
 tpu/experimental/hlo_vmem/
+
+# XLA HLO dump directories and packed archives: regenerable from tpu/repro, and
+# one dump alone is ~19k files.  The *.tar.gz rule above misses the .tgz spelling.
+tpu/results/**/hlo/
+*.tgz
