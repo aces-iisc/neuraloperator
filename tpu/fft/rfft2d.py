@@ -2,8 +2,8 @@ import jax.numpy as jnp
 
 from .core import ACC, F, complex_matmul, dft_matrix_reim, fft_staged_complex, rfft_staged
 
-# Contract the middle axis of a (rows, n, batch) block against an (out, n) matrix — no transpose.
-_mix_axis1 = lambda mat, x: jnp.einsum('on,rnk->rok', mat, x, preferred_element_type=ACC)
+# Contract the middle axis of an (a, w, t) block against a (d, w) matrix -- no transpose.
+_mix_axis1 = lambda mat, x: jnp.einsum('dw,awt->adt', mat, x, preferred_element_type=ACC)
 
 
 def _dft_axis1(x_re, x_im, size, dtype=F):

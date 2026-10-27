@@ -16,7 +16,7 @@ The winners live in fft/rfft1d.py.
 import jax
 import jax.numpy as jnp
 
-from ...fft.core import (CDTYPE, I8, I32, F, RADIX as B,
+from ...fft.core import (ACC, CDTYPE, I8, I32, F, RADIX as B,
                          complex_matmul as _karatsuba, dft_matrix,
                          fft_staged_complex as _fft_c)
 
@@ -224,6 +224,80 @@ def full_via_coupled(xr, eng):
     return _reconstruct_full(rfft_coupled(xr, eng), xr.shape[0])
 
 
+def rfft_coupled_low_modes(xr, n_modes, dt=F):
+    """The coupled packing applied to a LOW-MODE transform: pair the K real signals into K/2
+    complex ones, compute only the rows the unpack needs, then separate them.
+
+    Recovering A[k] and B[k] needs both Z[k] and its mirror Z[(N-k) mod N], so a band of m modes
+    forces 2m-1 rows of the DFT matrix rather than m.  That is the scheme's real cost and the band
+    does not shrink it.
+
+    cos and sin are stacked into one matmul rather than issued as Gauss/Karatsuba's three.  The
+    three-matmul form trades a matmul for an elementwise pass, which is the right trade when the
+    matmul dominates; at these shapes the matrix unit is a tenth of the call, so one wider call
+    and one fewer pass is cheaper.  The packed halves are the left and right column blocks of xr,
+    so [a | b] is xr itself and the operand costs nothing to form.
+
+    Real (N, K), K even -> (re, im), each (n_modes, K).
+    """
+    n, k_cols = xr.shape
+    cols = k_cols // 2
+
+    low = jnp.arange(n_modes)
+    mirror = (n - jnp.arange(1, n_modes)) % n
+    rows = jnp.concatenate([low, mirror])          # 2m-1 rows, as the unpack needs
+    n_rows = rows.shape[0]
+
+    angle = -2.0 * jnp.pi * jnp.outer(rows, jnp.arange(n)).astype(F) / n
+    stacked = jnp.concatenate([jnp.cos(angle), jnp.sin(angle)], axis=0).astype(dt)
+    both = jnp.matmul(stacked, xr.astype(dt), preferred_element_type=ACC)   # [a | b] == xr
+
+    cos_a, cos_b = both[:n_rows, :cols], both[:n_rows, cols:]
+    sin_a, sin_b = both[n_rows:, :cols], both[n_rows:, cols:]
+    z_re, z_im = cos_a - sin_b, sin_a + cos_b      # (cos + i sin) @ (a + i b)
+
+    zr, zi = z_re[:n_modes], z_im[:n_modes]
+    mr = jnp.concatenate([z_re[:1], z_re[n_modes:]], axis=0)
+    mi = jnp.concatenate([z_im[:1], z_im[n_modes:]], axis=0)
+    a_re, a_im = 0.5 * (zr + mr), 0.5 * (zi - mi)
+    b_re, b_im = 0.5 * (zi + mi), -0.5 * (zr - mr)
+    return (jnp.concatenate([a_re, b_re], axis=1).astype(dt),
+            jnp.concatenate([a_im, b_im], axis=1).astype(dt))
+
+def rfft_reduced_low_modes(xr, n_modes, dt=F):
+    """The reduced split applied to a LOW-MODE transform.
+    Even and odd samples are transformed separately at length N/2 and recombined with the twiddle,
+    X[k] = E[k] + W_N^k O[k].  A band of m modes needs E and O at m rows only, so both halves are
+    partial transforms.
+
+    The arithmetic does not improve on a plain partial DFT: two m x (N/2) matrices hold the same
+    m*N entries as one m x N matrix, and the recombination is added on top.  Folding the twiddle
+    into the odd matrix turns the pair back into exactly the partial DFT's matrix, so the split's
+    only contribution at a band is work it then has to undo.
+
+    What is avoidable is how it is issued.  A row-major (N, K) array reshaped to (N/2, 2K) already
+    has [even_i | odd_i] side by side in row i, so the operand needs no stride-2 gather, and
+    stacking cos over sin gives all four products from one (2m, N/2) x (N/2, 2K) call instead of
+    four narrow ones.
+
+    Real (N, K), N even -> (re, im), each (n_modes, K).
+    """
+    n, k_cols = xr.shape
+    half = n // 2
+    operand = xr.reshape(half, 2 * k_cols)        # row i = [even_i | odd_i], no copy
+
+    rows = jnp.arange(n_modes)
+    angle = -2.0 * jnp.pi * jnp.outer(rows, jnp.arange(half)).astype(F) / half
+    stacked = jnp.concatenate([jnp.cos(angle), jnp.sin(angle)], axis=0).astype(dt)
+    both = jnp.matmul(stacked, operand, preferred_element_type=ACC)
+
+    e_re, o_re = both[:n_modes, :k_cols], both[:n_modes, k_cols:]
+    e_im, o_im = both[n_modes:, :k_cols], both[n_modes:, k_cols:]
+    tw = -2.0 * jnp.pi * rows.astype(F) / n
+    wr, wi = jnp.cos(tw)[:, None], jnp.sin(tw)[:, None]
+    return e_re + wr * o_re - wi * o_im, e_im + wr * o_im + wi * o_re
+
+
 def full_via_reduced(xr, eng):
     """FULL (N,K): reduced rfft (half work) + conjugate reconstruct."""
     return _reconstruct_full(rfft_reduced(xr, eng), xr.shape[0])
@@ -234,35 +308,9 @@ _FULL = {"recompute": full_recompute,
          "viareduced": full_via_reduced}
 
 
-def rfft_coupled_low_modes(xr, n_modes, dt=F):
-    """The coupled packing applied to a LOW-MODE transform: pair the K real signals into K/2
-    complex ones, compute only the rows the unpack needs, then separate them.
 
-    The catch is the unpack.  Recovering A[k] and B[k] needs both Z[k] and its mirror
-    Z[(N-k) mod N], so a band of m modes forces us to evaluate 2m-1 rows of the DFT matrix
-    (k = 0..m-1 plus N-1..N-m+1), not m.  Half as many signals, but a matrix with twice the rows,
-    and the complex matmul costs 3 real matmuls where a real partial DFT costs 2 --
-    so this does about 1.5x the arithmetic of fft.rfft1d.rfft_low_modes for the same output.
-    Whether that matters is a memory question, which is why it is worth measuring rather than
-    arguing about.  Real (N, K), K even -> (re, im), each (n_modes, K)."""
-    n, k_cols = xr.shape
-    a, b = xr[:, :k_cols // 2], xr[:, k_cols // 2:]
 
-    low = jnp.arange(n_modes)                      # k = 0 .. m-1
-    mirror = (n - jnp.arange(1, n_modes)) % n      # the partners N-1 .. N-m+1
-    rows = jnp.concatenate([low, mirror])          # 2m-1 rows in total
 
-    angle = -2.0 * jnp.pi * jnp.outer(rows, jnp.arange(n)).astype(F) / n
-    cos, sin = jnp.cos(angle).astype(dt), jnp.sin(angle).astype(dt)
-    z_re, z_im = _karatsuba(_MAT_TRICK, cos, sin, (cos + sin).astype(dt),
-                            a.astype(dt), b.astype(dt))
 
-    # Z[k] for k = 0..m-1, and Z[(N-k) mod N] (k=0 is its own mirror, so it reuses row 0)
-    zr, zi = z_re[:n_modes], z_im[:n_modes]
-    mr = jnp.concatenate([z_re[:1], z_re[n_modes:]], axis=0)
-    mi = jnp.concatenate([z_im[:1], z_im[n_modes:]], axis=0)
 
-    a_re, a_im = 0.5 * (zr + mr), 0.5 * (zi - mi)          # A = (Z + conj(Z_mirror)) / 2
-    b_re, b_im = 0.5 * (zi + mi), -0.5 * (zr - mr)         # B = (Z - conj(Z_mirror)) / 2i
-    return (jnp.concatenate([a_re, b_re], axis=1).astype(dt),
-            jnp.concatenate([a_im, b_im], axis=1).astype(dt))
+

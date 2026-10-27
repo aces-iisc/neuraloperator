@@ -18,7 +18,7 @@ def add_grid(x):
 
 def conv1x1(w, x):
     """1x1 conv — the same linear map at every pixel.  w = {W (out, in), b (out,)}."""
-    return jnp.einsum("oi,bihw->bohw", w["W"], x) + w["b"][None, :, None, None]
+    return jnp.einsum("oi,nihw->nohw", w["W"], x) + w["b"][None, :, None, None]
 
 
 def channel_mlp(w, x):

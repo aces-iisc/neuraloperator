@@ -1,6 +1,15 @@
 import jax
 import jax.numpy as jnp
 
+# einsum index letters, used with these meanings everywhere in this package:
+#   n  sample          i  in-channel      o  out-channel    c  channel (in == out)
+#   h  grid row        w  grid col        a  row mode (the 2m band)   d  col mode (the low m)
+#   r  CP rank
+# The staged transform works on different tensors, so it uses its own letters rather than
+# borrowing these with new meanings:
+#   p  stage output    q  stage input (the radix)   s  stage column   t  packed batch
+#   g  block group (the row reversal)
+
 from ..arch import TPU_V5E
 
 # Memory-bound on v5e: the extra MXU passes of true-f32 matmuls hide behind the HBM wait, so
@@ -27,8 +36,8 @@ CBK_MIN_COLS = DEFAULT_ACCEL.transpose_fold_cols   # measured crossover for this
 # Two spellings of one radix stage. 'cbk' makes the permutation the matmul's write pattern, so
 # the transposed copy is never materialised. It pays only on wide stages; the threshold is
 # empirically tested, and wall clock cannot resolve it -- it needs device time.
-stage_matmul = lambda mat, x: jnp.einsum('br,rck->bck', mat, x, preferred_element_type=ACC)
-stage_matmul_t = lambda mat, x: jnp.einsum('br,rck->cbk', mat, x, preferred_element_type=ACC)
+stage_matmul = lambda mat, x: jnp.einsum('pq,qst->pst', mat, x, preferred_element_type=ACC)
+stage_matmul_t = lambda mat, x: jnp.einsum('pq,qst->spt', mat, x, preferred_element_type=ACC)
 leaf_matmul = lambda mat, x: jnp.matmul(mat, x, preferred_element_type=ACC)
 
 
@@ -161,9 +170,9 @@ def reverse_rows(x):
     n_blocks = rows // 128
     idx = jnp.arange(128)
     flip_within = (idx[None, :] == (127 - idx[:, None])).astype(F)      # 128x128 anti-identity
-    blocks = jnp.einsum('cd,ndk->nck', flip_within, x.reshape(n_blocks, 128, cols))
+    blocks = jnp.einsum('pq,gqw->gpw', flip_within, x.reshape(n_blocks, 128, cols))
     if n_blocks > 1:
         b = jnp.arange(n_blocks)
         flip_blocks = (b[None, :] == (n_blocks - 1 - b[:, None])).astype(F)
-        blocks = jnp.einsum('nm,mck->nck', flip_blocks, blocks)
+        blocks = jnp.einsum('gf,fpw->gpw', flip_blocks, blocks)
     return blocks.reshape(rows, cols)
