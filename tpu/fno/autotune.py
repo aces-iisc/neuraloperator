@@ -48,28 +48,51 @@ class AutoTune:
     of two depends on tiling the rules do not model.
     """
 
-    def __init__(self, accel, spec, weights_are_constant=True):
+    def __init__(self, accel, spec, weights_are_constant=True, max_batch=None):
         self.accel, self.spec = accel, spec
         # Captured weights are folded at compile time, so a relayout or a prebuilt operand costs
         # nothing and buys nothing.  Weights passed in -- always true while training -- are paid
         # for on every call, which is where hoisting and the ADIO layout earn their keep.
         self.weights_are_constant = weights_are_constant
+        # nothing can be larger than the split being evaluated
+        self.max_batch = max_batch
 
     # -- individual rules -----------------------------------------------------------
-    def batch(self, dtype="float32"):
-        """Start the sweep where the unit is full, or where memory runs out, whichever binds.
+    def capacity(self, dtype="float32"):
+        """How many samples the layer's working set keeps on chip at once.
 
-        The contracted axis is 2*channels after blocking.  While that is narrower than the
-        tile the free axis is what fills the array, so the batch has to reach the tile edge;
-        once it is wider, capacity is the binding constraint instead.
+        `working_bytes` counts the field and the buffers the transform holds live beside it,
+        not the filter or the DFT matrices, so this is the activation budget rather than a
+        true residency figure -- which is why it centres a search instead of capping it.
         """
         cost = LayerCost(self.spec, self.accel, dtype)
-        per_sample = cost.working_bytes(1)
-        capacity = max(1, self.accel.on_chip_bytes // max(1, per_sample))
-        if 2 * self.spec.channels < self.accel.tile:
-            return self.accel.tile, "narrow tile: batch fills the free axis"
-        return capacity, ("wide tile: on-chip capacity binds (an upper bound -- "
-                          "it overshoots, the search walks down from here)")
+        return max(1, self.accel.on_chip_bytes // max(1, cost.working_bytes(1)))
+
+    def batch(self, dtype="float32"):
+        """Fill the array if memory allows it, otherwise take what memory allows.
+
+        Step 3 is a batched matmul over the kept modes: the HLO carries both mode indices as
+        batch dimensions, so per mode the shape is `B x 2C` against `2C x 2C` and the batch is
+        the whole free axis.  The modes do not help fill it.
+
+        The step it moves in is `batch_grain`, NOT the array edge.  They are not the same
+        number: every measured optimum on v5e and v6e alike is a multiple of 128, including on
+        v6e whose array is 256 wide, and a batch between two multiples loses to both.  Using
+        the tile here would also disagree with `candidates`, which steps on the grain -- the
+        prediction and the grid it is searched on have to be the same thing.
+
+        Reaching the grain takes the cost per sample from `grain / B` down to 1, and past it
+        there is nothing more to win on occupancy, so the prediction is the grain or capacity,
+        whichever binds.  Both estimates run low -- Darcy-64 measures fastest at 128 against a
+        capacity of 85 -- which is what `candidates` searches around.
+        """
+        capacity = self.capacity(dtype)
+        grain = self.accel.batch_grain or self.accel.tile
+        if capacity < grain:
+            return capacity, (f"capacity is {capacity} samples, under the {grain} the array "
+                              f"consumes at once: memory binds before the free axis fills")
+        return grain, (f"capacity holds {capacity} samples, so the batch reaches the "
+                       f"{grain}-sample step; past it the free axis is already full")
 
     # Below this the block is cheap enough to rebuild that hoisting is inside run-to-run
     # noise -- measured at ~1 MiB, where the sign does not reproduce between runs.
@@ -175,19 +198,67 @@ class AutoTune:
                            f"hoist      {hoist}: {hoist_why}"))
 
     def candidates(self, dtype=None):
-        """The few batches worth measuring: the predicted one and its neighbours.
+        """The handful of batches worth measuring, on the grid the array makes meaningful.
 
-        The rules get the order of magnitude right; which power of two inside it is fastest
-        depends on tiling the rules do not model, so that part is measured.
+        `batch` predicts the largest batch that fits, so the search is dense around that
+        estimate rather than spread over octaves, and it has to reach a little past it: the
+        estimate runs low, and the point just over it is sometimes the fastest.
+
+        Which grid depends on whether the array or memory binds, because only one of them
+        quantises the batch.  With room for several tiles the sawtooth above the tile edge is
+        real and steep, so every candidate is a multiple of the tile; powers of two are right
+        here only while the tile is one.  With room for less than a tile nothing quantises at
+        all -- every batch costs the same single pass -- so the cost per sample falls smoothly
+        as 1/B and the optimum lands wherever capacity happens to fall.  The candidates there
+        are plain integers straddling it, which on Navier-Stokes at single precision is the
+        difference between 8 samples and 10.  The tile goes in as well, because filling the
+        array can be worth the spill and the model cannot tell in advance whether it is.
         """
         base = self.tune(dtype)
-        out = []
-        for shift in (-2, -1, 0, 1, 2):
-            batch = int(base.batch * (2.0 ** shift))
-            if batch >= 1 and batch not in [p.batch for p in out]:
-                out.append(Plan(batch=batch, dtype=base.dtype, method=base.method,
-                                hoist=base.hoist, notes=base.notes))
-        return out
+        # The batch steps on `batch_grain`, not on the array edge: measured on both TPU
+        # generations, every fastest batch is a multiple of 128 even where the array is 256
+        # wide.  Falling back to the tile is only for a target whose grain is not yet measured.
+        grain = self.accel.batch_grain or self.accel.tile
+        capacity = self.capacity(base.dtype)
+        # A split cannot be evaluated on more samples than it holds, so it caps the search as
+        # firmly as memory does -- and dropping the candidates above it would leave nothing to
+        # measure, so the ceiling itself becomes one.
+        ceiling = self.max_batch if self.max_batch else 1 << 30
+        bound = min(capacity, ceiling)
+        if bound >= grain:
+            # The first few multiples.  The reach goes half an estimate past capacity rather
+            # than stopping at it, because capacity runs low -- Darcy-64 measures fastest at
+            # 256 against a capacity of 113, on a working set 2.25x the on-chip budget -- and a
+            # candidate that does not fit costs one failed measurement, while one that is never
+            # proposed cannot be found at all.
+            values = {k * grain for k in (1, 2, 3, 4) if k * grain <= 1.5 * bound}
+            values |= {grain, bound}
+        else:
+            # Below the grain nothing is quantised, so the ladder is geometric rather than a
+            # cluster around `capacity`.  Clustering there assumes the estimate is roughly
+            # right, and in this regime it is not: Navier-Stokes in bfloat16 has a capacity of
+            # 21 and measures fastest at 4 or below, because halving the operand width halves
+            # the matmul but not the transform, and the layer turns bandwidth-bound instead of
+            # gaining from a wider batch.  Doubling from one sample costs a handful of cheap
+            # measurements and brackets the optimum wherever in the decade it actually sits.
+            values, step = {bound}, 1
+            while step <= 1.25 * bound:
+                values.add(step)
+                step *= 2
+            # Both hardware widths go in too.  Reaching the array edge can be worth a large
+            # spill and the model cannot tell when: Darcy-64 measures fastest at 256 on v6e,
+            # more than twice its own capacity, because the relayout its copy bucket pays below
+            # the edge -- 427 us per sample at 141, 18 at 256 -- costs more than streaming the
+            # overflow does.
+            # The optimum repeatedly sits just ABOVE capacity -- Darcy-64 at 128 against 113,
+            # Navier-Stokes on v6e at 12 against 10 -- because capacity counts activation bytes
+            # and a small spill is cheaper than the samples it buys.  Without these the ladder
+            # jumps straight from capacity to the grain and brackets the optimum from one side.
+            values |= {max(1, round(bound * f)) for f in (1.25, 1.5)}
+            values |= {grain, self.accel.tile}
+        values = {min(v, ceiling) for v in values if v >= 1}
+        return [Plan(batch=v, dtype=base.dtype, method=base.method,
+                     hoist=base.hoist, notes=base.notes) for v in sorted(values)]
 
     # -- walking around a prediction --------------------------------------------------
     @staticmethod
@@ -214,7 +285,7 @@ class AutoTune:
         return sorted(out)
 
     # -- measure what the rules cannot separate --------------------------------------
-    def search(self, measure, dtype=None, keep_failures=True):
+    def search(self, measure, dtype=None, keep_failures=True, plans=None):
         """Time each candidate and return them ranked, fastest first.
 
         `measure(plan)` runs the layer under that plan and returns microseconds per sample, or
@@ -222,7 +293,7 @@ class AutoTune:
         information -- it bounds the batch -- so by default it is recorded rather than dropped.
         """
         results = []
-        for candidate in self.candidates(dtype):
+        for candidate in (self.candidates(dtype) if plans is None else plans):
             try:
                 results.append(Measured(candidate, measure(candidate)))
             except Exception as exc:
@@ -232,19 +303,53 @@ class AutoTune:
         results.sort(key=lambda r: r.us_per_sample)
         return results
 
-    def best(self, measure, dtype=None):
-        """The fastest candidate that actually ran, with the rest kept for the record."""
+    def best(self, measure, dtype=None, refine=True, rounds=3):
+        """The fastest candidate that actually ran, refined where the curve is smooth.
+
+        Whether refining helps is a property of the regime, not of the target.  At or above
+        `batch_grain` the cost per sample is a sawtooth whose minima ARE the multiples, so
+        nothing lives between two rungs and the ladder is already the answer.  Below the grain
+        nothing quantises: the optimum sits wherever capacity falls, and the doubling ladder
+        steps straight over it -- Navier-Stokes on v6e measures fastest at 12 while the ladder
+        offers 10, a 5% loss no amount of re-running the same grid would find.
+
+        The bracket is held to within a factor of two of the winner.  Below the grain the rungs
+        are 1, 2, 4, 8, capacity, then the grain itself, so the neighbour above can be ten
+        times the winner, and bisecting into that gap spends every probe far from the optimum.
+        """
         ranked = self.search(measure, dtype)
         winners = [r for r in ranked if r.ok]
         if not winners:
             raise RuntimeError(f"no candidate ran: {[r.status for r in ranked]}")
         top = winners[0]
+        grain = self.accel.batch_grain or self.accel.tile
+
+        if refine and self.capacity(top.plan.dtype) < grain:
+            timed = {r.plan.batch: r for r in winners}
+            for _ in range(rounds):
+                order = sorted(timed)
+                winner = min(timed, key=lambda b: timed[b].us_per_sample)
+                at = order.index(winner)
+                lo = max(order[at - 1] if at else 1, winner // 2, 1)
+                hi = min(order[at + 1] if at + 1 < len(order) else winner * 2, winner * 2)
+                fresh = [b for b in ((lo + winner) // 2, (winner + hi) // 2)
+                         if b >= 1 and b not in timed
+                         and (self.max_batch is None or b <= self.max_batch)]
+                if not fresh:
+                    break
+                probes = [Plan(batch=b, dtype=top.plan.dtype, method=top.plan.method,
+                               hoist=top.plan.hoist, notes=top.plan.notes) for b in fresh]
+                for r in self.search(measure, dtype, plans=probes):
+                    if r.ok:
+                        timed[r.plan.batch] = r
+            top = timed[min(timed, key=lambda b: timed[b].us_per_sample)]
+            ranked = sorted(timed.values(), key=lambda r: r.us_per_sample)
+
         predicted = self.tune(dtype).batch
-        top.plan.notes += (f"searched    {[r.plan.batch for r in ranked]}",
+        top.plan.notes += (f"searched    {sorted(r.plan.batch for r in ranked)}",
                            f"chose       batch {top.plan.batch} at {top.us_per_sample:.2f} us"
                            f"/sample (rule predicted {predicted})",)
         return top
-
 
 @dataclass
 class Measured:
