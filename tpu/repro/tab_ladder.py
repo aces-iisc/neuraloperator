@@ -38,8 +38,12 @@ class Ladder(Bench):
 
     # what an untouched checkpoint is evaluated at, and what the chain therefore starts from
     TRAIN_BATCH = {"Burgers": 16, "Darcy-32": 8, "Darcy-64": 8, "NS-128": 8}
-    SWEEP = {"NS-128": [1, 2, 4, 8, 16]}
-    DEFAULT_SWEEP = [8, 16, 32, 64, 128, 256]
+    # The best batch tracks the matrix unit's edge, so a part with a wider unit wants a wider
+    # sweep: LADDER_SWEEP and LADDER_SWEEP_NS extend the range without touching the v5e defaults.
+    SWEEP = {"NS-128": [int(v) for v in
+                        os.environ.get("LADDER_SWEEP_NS", "1,2,4,8,16").split(",")]}
+    DEFAULT_SWEEP = [int(v) for v in
+                     os.environ.get("LADDER_SWEEP", "8,16,32,64,128,256").split(",")]
 
     @staticmethod
     def _variant(mix, stacked):

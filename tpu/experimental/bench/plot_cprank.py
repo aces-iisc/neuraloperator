@@ -16,9 +16,13 @@ import matplotlib.pyplot as plt
 
 ACC, TIME, REF = "#2f6fb2", "#c4622d", "#888888"
 OUT = sys.argv[1] if len(sys.argv) > 1 else "tpu/results/cprank/cprank.png"
-# (panel title, channels, csv)
-PANELS = [("Darcy $64^2$", 24, "tpu/results/cprank/tab_cprank.csv"),
-          ("Navier--Stokes $128^2$", 64, "tpu/results/cprank_ns/tab_cprank_ns.csv")]
+# (panel title, channels, csv) -- the first three share a filter shape, so their rank ladders
+# are the same and only the problem differs; Navier--Stokes is C = 64 and its landmarks move.
+R = "tpu/results/cprank2/tab_cprank_"
+PANELS = [("Burgers", 24, R + "Burgers.csv"),
+          ("Darcy $32^2$", 24, R + "Darcy-32.csv"),
+          ("Darcy $64^2$", 24, R + "Darcy-64.csv"),
+          ("Navier--Stokes $128^2$", 64, R + "NS-128.csv")]
 
 
 def load(path):
@@ -31,7 +35,7 @@ def load(path):
 
 def main():
     panels = [(t, c, load(p)) for t, c, p in PANELS]
-    fig, axes = plt.subplots(1, len(panels), figsize=(5.6 * len(panels), 4.3))
+    fig, axes = plt.subplots(1, len(panels), figsize=(4.5 * len(panels), 4.0))
     axes = [axes] if len(panels) == 1 else list(axes)
 
     for ax, (title, channels, (ranks, by, flat)) in zip(axes, panels):
@@ -42,7 +46,9 @@ def main():
         ax.set_xlabel("CP rank $R$")
         ax.set_ylabel("test rel $H^1$", color=ACC)
         ax.tick_params(axis="y", labelcolor=ACC)
+        ax.set_xscale("log", base=2)
         ax.set_xticks(ranks)
+        ax.set_xticklabels([str(r) for r in ranks], fontsize=8)
         ax.grid(alpha=.25)
 
         # The filters the sweep is placed between, at the same batch on the same weights.
@@ -61,8 +67,8 @@ def main():
         half = channels // 2
         if ranks[0] <= half <= ranks[-1]:
             ax.axvline(half, color=REF, ls=":", lw=1)
-            ax.annotate(f"$2R/C = 1$\nat $R={half}$", (half, max(h1)),
-                        textcoords="offset points", xytext=(6, -14),
+            ax.annotate(f"$R=C/2$", (half, max(h1)), ha="center",
+                        textcoords="offset points", xytext=(0, 6),
                         fontsize=8, color="#555555")
 
         ax2 = ax.twinx()

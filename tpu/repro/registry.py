@@ -21,9 +21,9 @@ CSV_ENV = {
     "docs_cbk": "DOCS_CBK_CSV",
     "docs_modes": "DOCS_MODES_OUT",
     "docs_bstar": "DOCS_BSTAR_CSV",
-    "docs_tuner": "DOCS_TUNER_CSV",
     "docs_final": "DOCS_FINAL_CSV",
     "docs_fact": "DOCS_FACT_CSV",
+    "docs_enginebatch": "BATCH_OUT",
     "docs_modesweep2d": "SW_CSV",
 }
 
@@ -39,6 +39,9 @@ ENTRIES = [
     # trains one model per rank, so it is the slow entry of the set; ask for it by name.
     (".tab_cprank", ["tab:cprank"], ("data", "weights", "slow"),
      "TFNO accuracy and time as the CP rank varies"),
+
+    (".tab_enginemodes", ["tab:enginemodes"], ("traces",),
+     "the three real-input row transforms against the band, on synthetic data"),
 
     ("..experimental.bench.docs_bench2",
      ["tab:engines-1d", "tab:engines-bf16", "tab:partial-1d",
@@ -75,14 +78,20 @@ ENTRIES = [
     ("..experimental.bench.docs_bstar", ["tab:bstar"], ("data", "weights"),
      "inference at the training batch and at B*"),
 
-    ("..experimental.bench.docs_tuner", ["tab:tuner"], (),
-     "the autotuner's search, on random data"),
+    (".tab_tuner", ["tab:tuner"], ("traces",),
+     "the batch the rules predict against the batch that measures fastest, with the device-time "
+     "buckets that say which resource bound"),
 
     ("..experimental.bench.docs_final", ["tab:results"], ("data", "weights"),
      "baseline against the tuned configuration, per dataset"),
 
     ("..experimental.bench.docs_fact", ["tab:factorized"], ("data",),
      "F-FNO and TFNO against the dense filter"),
+
+    # Thousands of cells over the (B, N, num_modes) volume, a couple of hours.  Fills the
+    # interactive viewers rather than a table, so ask for it by name.
+    ("..experimental.bench.docs_enginebatch", ["fig:enginevolume"], ("slow",),
+     "the three engines over a swept batch, in 1-D and 2-D"),
 
     # 772 runs, roughly two hours.  Fills a figure rather than a table, so it is not part of
     # a default reproduction; ask for it by name.

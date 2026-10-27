@@ -11,7 +11,7 @@ from ...fft.core import BF, F
 from ...fno import data, model
 from ..fno.reference import forward as jnp_fwd
 
-W = "tpu/results/baseline"
+W = os.environ.get("COMPARE_WEIGHTS", "tpu/results/baseline")
 ROOT = os.path.expanduser("~/data")
 CASES = {"Darcy-32": (24, 16, 32), "Darcy-64": (24, 16, 64)}
 

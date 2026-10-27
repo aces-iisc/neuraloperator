@@ -101,13 +101,18 @@ def part1_fft_1d():
 def part2_fno_inference():
     print("\n=== part 2: FNO inference ===", flush=True)
     print(f"  {'case':<16}{'engine':<20}{'dt':<6}{'wall':>11}{'HBM':>12}{'rel err':>12}", flush=True)
-    configs = [(128, 24, 8), (256, 16, 4), (1024, 8, 1)]
+    # (grid, channels, batch).  The 128/64 row is the Navier--Stokes preset the repository
+    # actually ships; without it the 128^2 rows report a C=24 layer under an NS heading.
+    configs = [(128, 24, 8), (128, 64, 8), (256, 16, 4), (1024, 8, 1)]
     for grid, channels, batch in configs:
         for m in (grid // 2, 12):
             key = jax.random.PRNGKey(0)
             w = _init_spectral_weight(key, channels, channels, m)
             x = jnp.asarray(np.random.randn(batch, channels, grid, grid).astype(np.float32))
-            case = f"{grid}^2 m={m}"
+            # channels are in the label because the trace tag is built from it; two rows
+            # at the same grid and band but different C would otherwise overwrite each
+            # other's trace and the device time would silently be the wrong run's
+            case = f"{grid}^2 m={m} C={channels}"
             base = np.asarray(jax.jit(lambda w_, z: spectral_conv(w_, z, m))(w, x), np.float64)
 
             record("fno", case, "reim+partial", "f32",

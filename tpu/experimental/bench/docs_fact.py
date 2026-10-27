@@ -15,6 +15,7 @@ import jax, jax.numpy as jnp, numpy as np
 from ...fft.core import F
 from ..fno import factorized as fz
 from ..fno import factorized_opt as fzo
+from .parse_ops import bucket_times
 
 ROOT = os.path.expanduser(os.environ.get("DOCS_DATA", "~/data"))
 # the four shipped datasets, with the channels and band each one is configured with
@@ -33,8 +34,14 @@ LOGDIR = os.environ.get("DOCS_PROF_DIR", "/tmp/prof_fact")
 REPS = 15
 RANK = int(os.environ.get("FACT_R", "8"))
 STEPS = int(os.environ.get("FACT_STEPS", "60"))
-FIELDS = ["engine", "case", "grid", "variant", "batch", "params",
-          "us_per_sample", "rel_l2", "status", "trace"]
+# FACT_BATCH="Burgers=512,Darcy-32=128" overrides the per-dataset batch in CASES.
+BATCH_OVERRIDE = dict(
+    (k, int(v)) for k, v in
+    (pair.split("=") for pair in os.environ.get("FACT_BATCH", "").split(",") if pair))
+FIELDS = ["engine", "transform", "filter_form", "case", "grid", "variant", "batch",
+          "params", "us_per_sample", "device_us_per_sample", "mxu_us", "vpu_us",
+          "copy_us", "dma_us", "rel_l2", "status", "trace"]
+BUCKETS = ["MXU matmul", "VPU / fusion", "reshape / copy", "DMA / HBM"]
 
 VARIANTS = [("dense", fz.dense_init, fz.dense_filter, fzo.dense_filter_opt, fzo.dense_block, {}),
             ("ffno", fz.sep_init, fz.sep_filter, fzo.sep_filter_opt, fzo.sep_block, {}),
@@ -68,15 +75,25 @@ def forward_jnp_filter(P, x, filt, m):
     return fz.channel_mlp(P["proj"], x)
 
 
+def jnp_arm(P, x, filt, m):
+    return forward_jnp_filter(P, x, filt, m)
+
+
+def ours_arm(P, x, filt, m):
+    return fz.forward(P, x, filt, m)
+
+
 def timed(fn, x, tag):
+    """Median wall time and the device-time split, both per call, from one trace."""
+    path = os.path.join(LOGDIR, tag)
     jax.block_until_ready(fn(x))
     samples = []
-    with jax.profiler.trace(os.path.join(LOGDIR, tag)):
+    with jax.profiler.trace(path):
         for _ in range(REPS):
             t0 = time.perf_counter()
             jax.block_until_ready(fn(x))
             samples.append(time.perf_counter() - t0)
-    return sorted(samples)[REPS // 2] * 1e6
+    return sorted(samples)[REPS // 2] * 1e6, bucket_times(path, REPS)
 
 
 def save(rows):
@@ -91,13 +108,23 @@ def main():
     print("baseline transform = jnp.fft.rfft2 / irfft2, complex64\n", flush=True)
     os.makedirs(LOGDIR, exist_ok=True)
     rows = []
-    # two engines: the plain jnp.fft path a published FNO uses, and ours with every transform
-    # and filter optimisation in place.  The filter variants are identical in both, so a
-    # difference between variants is the factorisation and a difference between engines is us.
-    engines = [("baseline", lambda P_, z, f, m: forward_jnp_filter(P_, z, f, m), False),
-               ("ours", lambda P_, z, f, m: fz.forward(P_, z, f, m), True)]
-    print(f"  {'engine':<10}{'case':<10}{'variant':<8}{'params':>11}"
-          f"{'us/sample':>12}{'rel L2':>12}", flush=True)
+    # Three engines.  "baseline" is the plain jnp.fft path a published FNO uses, with the filters
+    # in their published form too.  "baseline+opt" keeps that transform and swaps in the blocked,
+    # stacked, hoisted filter of Section 5, which isolates what the factorisation is worth when
+    # none of the transform work is helping.  "ours" has both.
+    # The full 2x2: the transform is either jnp.fft or ours, and the channel filter is either
+    # the form its paper issues -- separate real/imaginary einsums with the mode axes trailing --
+    # or the blocked ADIO form of Section 5, one real matmul against a stacked weight.  Holding
+    # one axis fixed and moving the other is what separates the two contributions.
+    engines = [("native+native", jnp_arm, False),
+               ("native+ours", jnp_arm, True),
+               ("ours+native", ours_arm, False),
+               ("ours+ours", ours_arm, True)]
+    only = [e.strip() for e in os.environ.get("FACT_ENGINES", "").split(",") if e.strip()]
+    if only:
+        engines = [e for e in engines if e[0] in only]
+    print(f"  {'engine':<14}{'case':<10}{'variant':<8}{'params':>11}"
+          f"{'device us':>12}{'wall us':>12}{'rel L2':>12}", flush=True)
     for label, loader, channels, modes, batch in CASES:
         if ONLY and label != ONLY:
             continue
@@ -107,6 +134,7 @@ def main():
             print(f"  {label:<10}SKIPPED  {type(exc).__name__}", flush=True)
             continue
         grid = xte.shape[-1]
+        batch = BATCH_OVERRIDE.get(label, batch)
         x = jnp.asarray(np.asarray(xte[:batch], np.float32))
         for eng_name, eng, blocked in engines:
           for name, init, filt, filt_opt, to_block, kw in VARIANTS:
@@ -119,20 +147,32 @@ def main():
                     P, use = prebuild(P, to_block), filt_opt
                 fwd = lambda P_, z, _f=use, _m=modes, _e=eng: _e(P_, z, _f, _m)
                 fn = jax.jit(lambda z, _P=P, _f=fwd: _f(_P, z))
-                us = timed(fn, x, tag) / x.shape[0]
+                us, buckets = timed(fn, x, tag)
+                us /= x.shape[0]
+                per = lambda key: buckets.get(key, 0.0) / x.shape[0]
                 err = fz.quick_train(fwd, P, xtr, ytr, xte, yte, steps=STEPS,
                                      batch=min(32, xtr.shape[0]))
-                rows.append({"engine": eng_name, "case": label, "grid": grid, "variant": name,
+                xform, form = eng_name.split("+")
+                rows.append({"engine": eng_name, "transform": xform, "filter_form": form,
+                             "case": label, "grid": grid, "variant": name,
                              "batch": x.shape[0], "params": fz.n_params(P),
-                             "us_per_sample": us, "rel_l2": err, "status": "ok", "trace": tag})
-                print(f"  {eng_name:<10}{label:<10}{name:<8}{fz.n_params(P):>11,}"
-                      f"{us:>12.2f}{err:>12.4e}", flush=True)
+                             "us_per_sample": us, "device_us_per_sample": per("total"),
+                             "mxu_us": per(BUCKETS[0]), "vpu_us": per(BUCKETS[1]),
+                             "copy_us": per(BUCKETS[2]), "dma_us": per(BUCKETS[3]),
+                             "rel_l2": err, "status": "ok", "trace": tag})
+                print(f"  {eng_name:<14}{label:<10}{name:<8}{fz.n_params(P):>11,}"
+                      f"{per('total'):>12.2f}{us:>12.2f}{err:>12.4e}", flush=True)
             except Exception as exc:
                 why = "OOM" if "RESOURCE" in str(exc).upper() else type(exc).__name__
-                rows.append({"engine": eng_name, "case": label, "grid": grid, "variant": name,
+                xform, form = eng_name.split("+")
+                rows.append({"engine": eng_name, "transform": xform, "filter_form": form,
+                             "case": label, "grid": grid, "variant": name,
                              "batch": x.shape[0], "params": 0, "us_per_sample": float("nan"),
-                             "rel_l2": float("nan"), "status": why, "trace": ""})
-                print(f"  {eng_name:<10}{label:<10}{name:<8}{why:>19}  "
+                             "device_us_per_sample": float("nan"), "mxu_us": float("nan"),
+                             "vpu_us": float("nan"), "copy_us": float("nan"),
+                             "dma_us": float("nan"), "rel_l2": float("nan"),
+                             "status": why, "trace": ""})
+                print(f"  {eng_name:<14}{label:<10}{name:<8}{why:>19}  "
                       f"{str(exc)[:70]}", flush=True)
             save(rows)
     save(rows)
