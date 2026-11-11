@@ -1,0 +1,10 @@
+# Upstream clones and the vendor toolchain: large, and each has its own history.
+ttsim/
+reference/
+toolchain/
+
+# Build output.
+fno/_out/
+
+# Compiled smoke-test binary.
+harness/smoke
