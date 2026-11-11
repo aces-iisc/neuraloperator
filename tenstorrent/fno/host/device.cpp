@@ -186,6 +186,52 @@ void Device::start_firmware(const std::vector<uint8_t> &image) {
     write_reg(TILE_SOFT_RESET_ADDR, ALL_RISCV_RESET_BITS & ~BRISC_SOFT_RESET_BIT);
 }
 
+void Device::start_pipeline(const StageImages &images) {
+    struct Placement {
+        const std::vector<uint8_t> *image;
+        uint32_t address;
+        uint32_t limit;          // the next thing in L1, which the image must not reach
+        const char *name;
+    };
+    // Each TRISC fetches from a fixed address, and those addresses are what decides the L1
+    // layout here rather than the other way round.  The command block at 0x08000 sits in the
+    // gap between T0's window and T1's, so the three images and the block never overlap.
+    const Placement placements[] = {
+        {images.unpack, TRISC0_RESET_PC, L1_COMMAND_ADDR, "unpack"},
+        {images.math, TRISC1_RESET_PC, TRISC2_RESET_PC, "math"},
+        {images.pack, TRISC2_RESET_PC, L1_MATRIX_ADDR, "pack"},
+    };
+
+    write_reg(TILE_SOFT_RESET_ADDR, ALL_RISCV_RESET_BITS);
+    for (const Placement &placement : placements) {
+        if (!placement.image || placement.image->empty()) {
+            throw std::runtime_error(std::string("no ") + placement.name + " image");
+        }
+        if (placement.address + placement.image->size() > placement.limit) {
+            throw std::runtime_error(std::string("the ") + placement.name +
+                                     " image does not fit before the next region of L1");
+        }
+        write_l1(placement.address, placement.image->data(),
+                 uint32_t(placement.image->size()));
+    }
+
+    // The command block, and the one word after it the stages use to agree that the
+    // configuration is in place, both start clear so no stage acts on stale contents.
+    std::vector<uint8_t> zeros(sizeof(CommandBlock) + 0x104u, 0);
+    write_l1(L1_COMMAND_ADDR, zeros.data(), uint32_t(zeros.size()));
+
+    // Release the three TRISCs together.  BRISC and NC stay in reset: neither has a part in
+    // this, and NC could not issue Tensix instructions even if it did.
+    //
+    // Auto TTSync's reset bit is also released.  That only makes the feature available; the
+    // firmware still has to switch it on, which it cannot do on the simulator because the
+    // simulator has no such register.  Releasing it here costs nothing and means the board does
+    // not need a different host.
+    // Writing the mask with only B and NC set releases T0/T1/T2 and leaves Auto TTSync's bit
+    // clear, which is its out-of-reset state.
+    write_reg(TILE_SOFT_RESET_ADDR, ALL_RISCV_RESET_BITS & ~ALL_TRISC_RESET_BITS);
+}
+
 void Device::stop_firmware() {
     write_reg(TILE_SOFT_RESET_ADDR, ALL_RISCV_RESET_BITS);
 }

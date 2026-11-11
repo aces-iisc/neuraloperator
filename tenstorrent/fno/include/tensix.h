@@ -13,11 +13,41 @@
 #define TENSIX_INST_BASE    0xFFE40000u   // a 32-bit store here pushes one Tensix instruction
 #define TENSIX_CFG_BASE     0xFFEF0000u   // configuration register i at +4i
 
+// The coprocessor runs three independent instruction streams, called Tensix threads, and a baby
+// core reaches one by the address it stores to.  T0/T1/T2 each have exactly one thread they can
+// push to, and it is always TENSIX_INST_BASE from their point of view; only RISCV B can pick,
+// by using the other two ports.  RISCV NC cannot push Tensix instructions at all, which is why
+// a "reader kernel" moves data over the NoC rather than through the coprocessor.
+#define TENSIX_INST1_BASE   0xFFE50000u   // RISCV B -> Tensix thread T1; illegal from T0/T1/T2
+#define TENSIX_INST2_BASE   0xFFE60000u   // RISCV B -> Tensix thread T2; illegal from T0/T1/T2
+
+// Each baby core sees its own 4 KiB of local data RAM at this same address, so every core can
+// put its stack at the top of it without colliding with any other core.  The region above it
+// is unmapped: a stack pointer past 0xFFB01000 writes nowhere, silently.
+#define MEM_LOCAL_BASE      0xFFB00000u
+#define MEM_LOCAL_TOP       0xFFB01000u
+
 // -- the tile's registers, as seen from the host through a BAR window ------------------------
 #define TILE_REG_WINDOW_BASE 0xFFA00000ull
 #define TILE_SOFT_RESET_ADDR 0xFFB121B0u
 #define BRISC_SOFT_RESET_BIT 0x800u
-#define ALL_RISCV_RESET_BITS 0x47800u
+#define TRISC0_SOFT_RESET_BIT 0x1000u
+#define TRISC1_SOFT_RESET_BIT 0x2000u
+#define TRISC2_SOFT_RESET_BIT 0x4000u
+#define ALL_TRISC_RESET_BITS  0x7000u
+#define ALL_RISCV_RESET_BITS  0x47800u    // B, T0, T1, T2, NC
+
+// Auto TTSync interlocks a TRISC's plain stores to Tensix configuration against the instructions
+// that thread has in flight, which is the difference between a correct raw store and a race.  It
+// covers T0/T1/T2 only, never B or NC, and it has to be taken out of reset to do anything.
+#define AUTO_TTSYNC_SOFT_RESET_BIT 0x800000u
+
+// Where each TRISC starts fetching when its reset bit is released.  These are the fixed values
+// used unless RISCV_DEBUG_REG_TRISC_RESET_PC_OVERRIDE redirects them, and they are far enough
+// apart to hold a small program each.  The command block at 0x08000 sits in the gap after T0.
+#define TRISC0_RESET_PC 0x06000u
+#define TRISC1_RESET_PC 0x0A000u
+#define TRISC2_RESET_PC 0x0E000u
 
 // -- instruction encoding --------------------------------------------------------------------
 // Every Tensix instruction is one 32-bit word: the opcode in bits 31..24, operands below it.
@@ -89,11 +119,63 @@
     TT_OP(0xa2, (((uint32_t)(stall_res) << 15) + ((uint32_t)(wait_res) << 0)))
 #define TT_OP_NOP TT_OP(0x02, 0)
 
-#define STALL_THCON 0x080u
-#define STALL_PACK  0x100u
-#define STALL_MATH  0x200u
-#define WAIT_FPU    0x001u
-#define WAIT_PACK   0x008u
+// RMWCIB writes one byte of a configuration register, with the value as an immediate, and it is
+// a Tensix instruction rather than a store from the RISC-V core.  That difference is the whole
+// point of it: an instruction is ordered against the other instructions in the same stream, so
+// a base address written this way is in place for the instruction that follows and cannot be
+// overwritten early by a core that has run ahead.  Four of them cover a 32-bit register.
+#define TT_OP_RMWCIB0(mask, data, cfg_reg_addr) \
+    TT_OP(0xb3, (((uint32_t)(mask) << 16) + ((uint32_t)(data) << 8) + (uint32_t)(cfg_reg_addr)))
+#define TT_OP_RMWCIB1(mask, data, cfg_reg_addr) \
+    TT_OP(0xb4, (((uint32_t)(mask) << 16) + ((uint32_t)(data) << 8) + (uint32_t)(cfg_reg_addr)))
+#define TT_OP_RMWCIB2(mask, data, cfg_reg_addr) \
+    TT_OP(0xb5, (((uint32_t)(mask) << 16) + ((uint32_t)(data) << 8) + (uint32_t)(cfg_reg_addr)))
+#define TT_OP_RMWCIB3(mask, data, cfg_reg_addr) \
+    TT_OP(0xb6, (((uint32_t)(mask) << 16) + ((uint32_t)(data) << 8) + (uint32_t)(cfg_reg_addr)))
+
+// STALLWAIT takes two masks and they are easy to confuse, so both are spelled out here against
+// the architecture's own bit names.  `stall_res` is the nine-bit *block* mask B0..B8: which kinds
+// of instruction this thread may not start.  `wait_res` is the thirteen-bit *condition* mask
+// C0..C12: what has to be quiet before the block lifts.  A wrong bit here is invisible on the
+// simulator, which ignores the block mask outright and treats most conditions as already met,
+// and becomes a data race on silicon.
+
+// Block mask: what to hold back.
+#define BLOCK_SYNC    0x002u   // B1  Sync Unit, so a SEMPOST waits behind this thread's work
+#define BLOCK_PACK    0x004u   // B2  Packer
+#define BLOCK_UNPACK  0x008u   // B3  Unpacker
+#define BLOCK_THCON   0x020u   // B5  Scalar Unit (ThCon)
+#define BLOCK_MATH    0x040u   // B6  Matrix Unit (FPU)
+#define BLOCK_CFG     0x080u   // B7  Configuration Unit
+#define BLOCK_SFPU    0x100u   // B8  Vector Unit (SFPU)
+
+// Condition mask: what has to finish first.
+#define WAIT_THCON    0x001u   // C0  Scalar Unit busy, or its memory requests outstanding
+#define WAIT_UNPACK0  0x002u   // C1  this thread has an instruction in unpacker 0
+#define WAIT_UNPACK1  0x004u   // C2  this thread has an instruction in unpacker 1
+#define WAIT_PACK     0x008u   // C3  this thread has an instruction in the packer
+#define WAIT_FPU      0x010u   // C4  this thread has an instruction in the matrix unit
+#define WAIT_SRCA_FREE 0x020u  // C5  SrcA's unpack bank is not yet released to the unpackers
+#define WAIT_SRCA_RDY 0x080u   // C7  SrcA's matrix bank is not yet released to the matrix unit
+#define WAIT_SRCB_RDY 0x100u   // C8  SrcB's matrix bank is not yet released to the matrix unit
+#define WAIT_CFG_WR   0x400u   // C10 this thread's RISCV has a config/GPR write still in flight
+
+// -- the Sync Unit's semaphores ---------------------------------------------------------------
+// Eight counting semaphores shared by the three threads, which is how one thread tells another
+// that a buffer is filled or freed.  `sem_sel` is a one-hot mask, not an index.  SEMPOST adds
+// one, SEMGET takes one away, and SEMWAIT latches the thread until the condition clears:
+//   SEM_COND_NONZERO  keep waiting while the semaphore is zero   (a consumer waiting for data)
+//   SEM_COND_NOTFULL  keep waiting while it is at its maximum    (a producer waiting for space)
+#define SEM_COND_NONZERO 0x1u
+#define SEM_COND_NOTFULL 0x2u
+#define TT_OP_SEMINIT(max_value, init_value, sem_sel) \
+    TT_OP(0xa3, (((uint32_t)(max_value) << 20) + ((uint32_t)(init_value) << 16) + \
+                 ((uint32_t)(sem_sel) << 2)))
+#define TT_OP_SEMPOST(sem_sel) TT_OP(0xa4, ((uint32_t)(sem_sel) << 2))
+#define TT_OP_SEMGET(sem_sel)  TT_OP(0xa5, ((uint32_t)(sem_sel) << 2))
+#define TT_OP_SEMWAIT(stall_res, sem_sel, wait_sem_cond) \
+    TT_OP(0xa6, (((uint32_t)(stall_res) << 15) + ((uint32_t)(sem_sel) << 2) + \
+                 (uint32_t)(wait_sem_cond)))
 
 // -- data formats the matrix unit accepts ----------------------------------------------------
 // There is no fp32 multiply: fp32 in, and the unit still only multiplies the narrower forms.
@@ -142,4 +224,36 @@ typedef struct {
     volatile uint32_t packs;            // PACR: result rows moved Dst -> L1
     volatile uint32_t heartbeat;        // incremented every command, so a hang is visible
     volatile uint32_t error;
+    // The three-thread firmware needs a launch signal the threads cannot race on.  `doorbell`
+    // cannot serve: whichever thread cleared it would let the others see the same command twice.
+    // So the host only ever increments `epoch`, each thread remembers the epoch it last ran, and
+    // each sets its own bit in `done_mask` when it is finished with that epoch.
+    volatile uint32_t epoch;
+    volatile uint32_t done_mask;        // bit i set by thread i once it has finished this epoch
 } CommandBlock;
+
+// Field offsets, for the host, which writes words rather than the struct.
+#define CMDF_DOORBELL  0u
+#define CMDF_DONE      1u
+#define CMDF_ROW_TILES 2u
+#define CMDF_DEPTH_TILES 3u
+#define CMDF_COL_TILES 4u
+#define CMDF_PHASES    5u
+#define CMDF_FORMAT    6u
+#define CMDF_MVMULS    7u
+#define CMDF_UNPACKS   8u
+#define CMDF_PACKS     9u
+#define CMDF_HEARTBEAT 10u
+#define CMDF_ERROR     11u
+#define CMDF_EPOCH     12u
+#define CMDF_DONE_MASK 13u
+
+// Which semaphore carries which handoff in the three-thread firmware.  One-hot, as `sem_sel`
+// wants.  The counts are credits, not flags: SRC_FREE starts at the number of Src banks so the
+// unpacker may run that many steps ahead of the matrix unit, and no further.
+#define SEM_OPERANDS 0x01u   // unpack -> math: one k-step's operands are in Src
+#define SEM_SRC_FREE 0x02u   // math -> unpack: a Src bank has been released
+#define SEM_DST_FULL 0x04u   // math -> pack:   an output block is accumulated in Dst
+#define SEM_DST_FREE 0x08u   // pack -> math:   a Dst half has been read out
+#define SRC_BANKS 2u         // SrcA and SrcB are double banked, which is what allows overlap
+#define DST_HALVES 2u        // our 8-row block fits twice over in Dst with room to spare

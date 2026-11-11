@@ -182,7 +182,7 @@ Counts matmul(const CommandBlock *cmd) {
 
             // Drain the FPU before the packer reads Dst, and the packer before the next block
             // overwrites Dst or moves the output base.
-            issue(TT_OP_STALLWAIT(STALL_PACK, WAIT_FPU));
+            issue(TT_OP_STALLWAIT(BLOCK_PACK, WAIT_FPU));
             set_l1_base(CFG_PACK_BASE, L1_OUTPUT_ADDR + (i * cols + j) * y_tile_bytes);
             issue(TT_OP_SETADCXY(4u, 0u, 0u, 0u, 0u, 10u));    // packer reads from Dst row 0
             // The four Dst read interfaces cover four rows at a time, so an 8x16 block is two
@@ -192,7 +192,7 @@ Counts matmul(const CommandBlock *cmd) {
             // re-read from the base register.
             issue(TT_OP_PACR(0u, 0u, 0u, 1u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u));  // rows 0..3
             issue(TT_OP_PACR(0u, 0u, 0u, 2u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 1u));  // rows 4..7
-            issue(TT_OP_STALLWAIT(STALL_THCON, WAIT_PACK));
+            issue(TT_OP_STALLWAIT(BLOCK_CFG, WAIT_PACK));
             counts.packs += 2u;                    // rows 0..3 and rows 4..7
         }
     }

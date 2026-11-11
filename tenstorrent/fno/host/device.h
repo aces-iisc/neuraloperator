@@ -56,6 +56,16 @@ public:
     void start_firmware(const std::vector<uint8_t> &image);
     void stop_firmware();
 
+    // The three-stage form: one image per Tensix thread, each written at the reset address of
+    // the TRISC that runs it, then all three released together.  BRISC stays in reset, because
+    // nothing needs it: the host writes the command block over PCIe and the TRISCs read it.
+    struct StageImages {
+        const std::vector<uint8_t> *unpack;
+        const std::vector<uint8_t> *math;
+        const std::vector<uint8_t> *pack;
+    };
+    void start_pipeline(const StageImages &images);
+
     // Advances the simulation.  Nothing in the device moves outside these calls.
     void clock(uint32_t steps);
 

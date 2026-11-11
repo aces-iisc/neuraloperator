@@ -91,6 +91,57 @@ transform matrix and its own slice of the signals. Results:
 | `padding_overhead` | total work split over total work on one tile |
 | `max_abs_diff` | against the one-tile result; 0 everywhere it could be checked |
 
+## Three kernels, and what the split actually cost
+
+The one-core firmware runs on RISCV B and issues unpack, multiply and pack in sequence. The
+three-stage firmware in `fw/pipeline.cpp` puts each of those on its own Tensix thread, which is
+how tt-metal kernels are organised and the only arrangement in which the stages can overlap:
+
+| thread | stage | issues |
+| --- | --- | --- |
+| T0 | unpack | `UNPACR` into SrcA and SrcB, one pair per reduction step |
+| T1 | math | `MVMUL`, once per fidelity phase, accumulating in Dst |
+| T2 | pack | two `PACR` per 8x16 output block |
+
+The overlap comes from hardware. SrcA and SrcB are double banked: the unpacker fills one bank
+while the matrix unit reads the other. So T0 can be a reduction step ahead of T1, and all
+software has to supply is a credit that stops it getting further than the banks allow. That is
+what the Sync Unit's semaphores do here, one pair per handoff. Dst is left single buffered, so
+pack does not yet overlap math; Dst has 512 fp32 rows and a block uses eight, so the room is
+there, and keeping Dst addressing identical to the one-core version is what makes the comparison
+below mean something.
+
+`check_pipeline` runs both firmwares on the same inputs and compares. Twelve shapes, chosen so
+each loop bound fails on its own if it is wrong, and every one comes back **bit-identical with
+matching MVMUL, UNPACR and PACR counts**. That is the strongest claim available: the split
+changed who issues each instruction, and changed nothing about the arithmetic.
+
+Two things the split needed that the one-core version did not, both found by running it:
+
+- **Per-thread state is per thread.** The AddrMod table that `SETC16` writes and the address
+  counters that `SETADCXX` bounds belong to the issuing thread, not the tile. Only the `cfg()`
+  registers are shared. A pack stage inheriting another thread's setup finds the packer's datum
+  count at its reset value of one instead of sixteen.
+- **A base address must be written by an instruction, not by a store.** With one core, a store
+  to a configuration register followed by the instruction that reads it behaves itself. With
+  three, each core runs its own loop and gets ahead of its own instruction stream. With plain
+  stores the pack stage wrote four blocks' results to the addresses of four *later* blocks and
+  left the first four never written. `RMWCIB` carries the value as an immediate from inside the
+  instruction stream and cannot be overtaken.
+
+That second one is a bug the one-core firmware has too, latent. Auto TTSync is the hardware
+interlock that makes the plain store safe, it covers T0/T1/T2 and never RISCV B, and it cannot
+be switched on here because the simulator has no such register. So the one-core path depends on
+the core and the coprocessor staying in step, which is true in the simulator and not promised on
+a board.
+
+**What this cannot show is a speedup.** There is no time to measure, and the simulator does not
+model the stalls either: it ignores `STALLWAIT`'s block mask outright and treats most of its
+conditions as already met. What it does model, and did enforce, is the semaphore protocol -- it
+rejected the first version of this firmware for a `SEMWAIT` whose block mask left out the Sync
+Unit, which would have let the following `SEMGET` take a credit that was not there. So the
+structure is verified and the overlap is argued from the ISA, not measured.
+
 ## The instruction everything rests on
 
 ```
@@ -132,6 +183,9 @@ accuracy decision. The transform matrix and the field data are not interchangeab
 | `host/check_mvmul.cpp` | the matrix unit against a host reference, shape by shape |
 | `host/probe_dst.cpp` | Dst through the debug array port, for when the packer is the suspect |
 | `host/sweep.cpp` | the ladder, to CSV |
+| `fw/pipeline.cpp` | the same matmul split across three Tensix threads, one source per stage |
+| `host/pipeline_matmul.{h,cpp}` | the three-stage form of one matmul, driven by an epoch counter |
+| `host/check_pipeline.cpp` | three stages against one core, bit for bit |
 | `tools/cfgreg.py` | which config register a named field lives in, read from the simulator's own description |
 
 ## Building and running
@@ -140,8 +194,10 @@ The firmware needs Tenstorrent's RISC-V toolchain; set `SFPI` if it is not in `.
 
 ```sh
 ./build.sh
-_out/check_mvmul ../ttsim/src/_out/release_bh/libttsim.so    # the matrix unit, verified
-_out/sweep       ../ttsim/src/_out/release_bh/libttsim.so    # the engines, to results/
+_out/check_mvmul     ../ttsim/src/_out/release_bh/libttsim.so  # the matrix unit, verified
+_out/check_pipeline  ../ttsim/src/_out/release_bh/libttsim.so  # three stages vs one core
+_out/sweep           ../ttsim/src/_out/release_bh/libttsim.so  # the engines, to results/
+_out/scale           ../ttsim/src/_out/release_bh/libttsim.so  # across the Tensix, to results/
 ```
 
 Every axis is a power of two, so columns line up across grids and a missing cell is a shape that
