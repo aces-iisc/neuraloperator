@@ -63,7 +63,6 @@ class _SpectralBase(nn.Module):
     def band_keys(self):
         return self._bands[3], self._bands[4]
 
-    # -- sample-major ----------------------------------------------------------------
     def analyse(self, x):
         t = self.transform()
         row_band, col_band = self.bands(x)
@@ -77,7 +76,6 @@ class _SpectralBase(nn.Module):
         field = t.rows_inverse(cols_re, cols_im, row_band, n_rows)
         return (field / (n_rows * n_cols)).to(F)
 
-    # -- mode-major ------------------------------------------------------------------
     def analyse_mode_major(self, x):
         """(n, c, h, w) -> (a, d, n, 2c), stacked real and imaginary on the channel axis."""
         n, c, h, w = x.shape

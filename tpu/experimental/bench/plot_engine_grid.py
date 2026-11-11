@@ -30,19 +30,36 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-GPU = ("RTX 5070", "tpu/results/gpu5070/engines_grid_gpu.csv", "graph_us")
-TPU = ("TPU v5e", "tpu/results/enginephase/engines_grid_tpu.csv", "device_us")
+# The batch is a constant, not a function of the grid, and differs between the two
+# dimensionalities because the dataset does: a 1-D cell is N*B elements and a 2-D cell is
+# B*N^2, so the widest batch that fits every grid in 2-D is far narrower.  It also differs
+# between the devices, because the GPU sweep steps the batch in powers of two and the TPU
+# record predates that.  Kept in step with tab_enginegrid_tex.py, so each figure and the
+# table beside it are the same experiment.
+def batches(device, one_d, two_d):
+    return {1: int(os.environ.get(f"{device}_B1", one_d)),
+            2: int(os.environ.get(f"{device}_B2", two_d))}
+
+
+GPU = ("RTX 5070", ["tpu/results/gpu5070/engines_batch_gpu.csv"], "graph_us",
+       batches("GPU", 16384, 16))
+TPU = ("TPU v5e", ["tpu/results/repro/docs_enginebatch.csv",
+                   "tpu/results/enginebatch/engines_batch_tpu.csv"], "device_us",
+       batches("TPU", 20000, 20))
 ENGINES = ["reim", "coupled", "reduced"]
 STYLE = {"reim": ("#2f6fb2", "o"), "coupled": ("#c4622d", "s"), "reduced": ("#3f8f52", "^")}
 
 
-def load(path, column, dims):
-    """{(family, grid, n_modes): {engine: us}} for one dimensionality."""
-    if not os.path.exists(path):
+def load(paths, column, dims, batch):
+    """{(family, grid, n_modes): {engine: us}} for one dimensionality at the fixed batch."""
+    path = next((p for p in paths if os.path.exists(p)), None)
+    if path is None:
         return None
     cells = collections.defaultdict(dict)
     for row in csv.DictReader(open(path)):
         if int(row["dims"]) != dims or not row.get(column):
+            continue
+        if row.get("B") and int(row["B"]) != batch[dims]:
             continue
         key = (row["family"], int(row["grid"]), int(row["n_modes"]))
         cells[key][row["engine"]] = float(row[column])
@@ -121,8 +138,8 @@ def main():
     tag = "" if which == "both" else f"_{which}"
     suffix = "" if show_lib else "_nolib"
     out = argv[1] if len(argv) > 1 else f"tpu/results/engine_grid{tag}_{dims}d{suffix}.png"
-    panels = [(f"{name}, {dims}-D", load(path, column, dims))
-              for name, path, column in sources]
+    panels = [(f"{name}, {dims}-D", load(paths, column, dims, batch))
+              for name, paths, column, batch in sources]
     panels = [(label, cells) for label, cells in panels if cells]
     if not panels:
         raise SystemExit(f"no {dims}-D sweep found; run the grid benches first")

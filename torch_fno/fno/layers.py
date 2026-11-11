@@ -71,7 +71,6 @@ def axis_block(w_re, w_im):
     return torch.cat([left, right], dim=2)
 
 
-# -- losses, matching neuralop's reductions -------------------------------------------
 def mse(pred, y):
     return torch.mean((pred - y) ** 2)
 

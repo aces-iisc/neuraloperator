@@ -6,6 +6,11 @@ and sweeps it, which answers the different question of what each engine costs at
 caller actually has.  The two are not interchangeable: a fixed batch means the work per cell
 grows with N, so the small-N end sits on the launch floor and the large-N end does not.
 
+Both swept axes are powers of two: the batch from 1 to 2^14, the band from 2 up to the grid.
+The grid is a power of two, so a ladder in powers of two lands on the shapes the hardware pads
+to anyway, and every grid is sampled at the same batches and the same bands.  A cell missing
+from the table is then a shape that does not exist or does not fit, never a gap in the sampling.
+
 B is the batch in both dimensionalities -- the number of independent signals in 1-D, the number
 of fields in 2-D.  The data is therefore B*N floats in 1-D and B*N^2 in 2-D, so the 2-D volume
 is a wedge rather than a box: one 4096^2 field is 67 MiB on its own, and the row pass needs the
@@ -46,7 +51,12 @@ FIELDS = ["dims", "family", "grid", "B", "n_modes", "engine",
           "eager_us", "graph_us", "rel_err", "status"]
 
 GRIDS = [2 ** p for p in range(4, 13)]
-BATCHES = [1, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+BATCHES = [int(b) for b in
+           os.environ.get("BATCH_SIZES",
+                          ",".join(str(2 ** p) for p in range(0, 15))).split(",")]
+MODES = [int(m) for m in
+         os.environ.get("BATCH_MODES",
+                        ",".join(str(2 ** p) for p in range(1, 13))).split(",")]
 BAND = [("reim", rfft_low_modes),
         ("coupled", rfft_coupled_low_modes),
         ("reduced", rfft_reduced_low_modes)]
@@ -55,10 +65,16 @@ STAGED = [("reim", rfft_half), ("coupled", rfft_coupled_half),
 FFT2 = FFT(dtype=F)
 
 
-def modes_grid(grid, points=POINTS):
-    """About `points` values of num_modes from 2 to N, even and log-spaced."""
-    raw = np.unique(np.round(np.geomspace(2, grid, points) / 2).astype(int) * 2)
-    return [int(m) for m in raw if 2 <= m <= grid]
+def modes_grid(grid):
+    """The shared band ladder, clipped to the bands this grid can hold.
+
+    One ladder for every grid rather than a log-spaced set per grid.  A per-grid ladder samples
+    each grid nicely on its own but the ladders do not line up between grids, so a table of N
+    against num_modes ends up mostly empty and two grids can never be compared at the same band.
+    Powers of two, because a grid is a power of two and a band wider than its grid does not
+    exist, which makes the gaps in the table exactly the region that does not exist.
+    """
+    return [m for m in MODES if m <= grid]
 
 
 def input_bytes(dims, grid, batch):

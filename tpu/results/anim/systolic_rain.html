@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Systolic rain</title>
+<style>
+  :root{--bg:#fff;--fg:#17191c;--dim:#6b7280;--line:#d4d8de;--panel:#f6f7f9;
+        --cell:#eceef1;--idle:#e2e5ea;--hold:#2f6fb2;--out:#3f8f52}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#14161a;--fg:#e7e9ec;--dim:#9aa3ae;--line:#2c3139;--panel:#1b1e24;
+    --cell:#232831;--idle:#1e222a;--hold:#5b9bd5;--out:#63b074}}
+  :root[data-theme="dark"]{--bg:#14161a;--fg:#e7e9ec;--dim:#9aa3ae;--line:#2c3139;
+    --panel:#1b1e24;--cell:#232831;--idle:#1e222a;--hold:#5b9bd5;--out:#63b074}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 16px 56px}
+  h1{font-size:19px;font-weight:600;margin:0 0 3px}
+  .sub{color:var(--dim);margin:0 0 16px;font-size:13px;max-width:84ch}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  button,select{font:inherit;color:var(--fg);background:var(--panel);
+    border:1px solid var(--line);border-radius:7px;padding:6px 12px;cursor:pointer}
+  button:hover,select:hover{border-color:var(--hold)}
+  button.on{background:var(--hold);border-color:var(--hold);color:#fff}
+  canvas{width:100%;height:auto;display:block;border:1px solid var(--line);
+    border-radius:10px;background:var(--panel)}
+  label.rng{display:flex;align-items:center;gap:7px;color:var(--dim);font-size:12px}
+  input[type=range]{width:130px;accent-color:var(--hold)}
+  .note{color:var(--dim);font-size:12.5px;margin-top:18px;max-width:86ch}
+  .note b{color:var(--fg);font-weight:600}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em}
+  @media (max-width:560px){.wrap{padding:14px}}
+</style>
+<div class="wrap">
+  <h1>A batch raining through the matrix unit</h1>
+  <p class="sub">An 8-point transform of 3 signals, every number real. Weights sit still in the
+     cells. Activations enter from the left, partial sums fall downward, finished answers drip
+     out of the bottom.</p>
+  <div class="bar">
+    <button id="play" class="on">Pause</button>
+    <button id="step">Step</button>
+    <button id="back">Back</button>
+    <button id="reset">Restart</button>
+    <label class="rng">speed <input type="range" id="speed" min="2" max="40" value="11"></label>
+    <select id="scale">
+      <option value="48">full size: Darcy, 2C = 48</option>
+      <option value="128">full size: Navier-Stokes, 2C = 128</option>
+    </select>
+    <button id="theme">Theme</button>
+  </div>
+  <canvas id="c" width="1140" height="690"></canvas>
+  <p class="note" id="legend"></p>
+</div>
+<script>
+const C = Math.SQRT1_2;                      // 0.7071
+// Stationary weights. T[j][n] is the DFT row for output j at grid point n.
+const T = [[1, 1, 1, 1, 1, 1, 1, 1],
+           [1, C, 0, -C, -1, -C, 0, C],
+           [0, 0, 0, 0, 0, 0, 0, 0],
+           [0, -C, -1, -C, 0, C, 1, C]];
+const OUTNAME = ["Re X[0]", "Re X[1]", "Im X[0]", "Im X[1]"];
+const BATCH = [
+  {n: "A", why: "constant", v: [1, 1, 1, 1, 1, 1, 1, 1]},
+  {n: "B", why: "one cosine", v: [1, C, 0, -C, -1, -C, 0, C]},
+  {n: "C", why: "an impulse", v: [1, 0, 0, 0, 0, 0, 0, 0]}
+];
+const N = 8, M = 4, KB = 3, EDGE = 8, LAST = KB - 1 + M - 1 + N;
+const HUE = ["hsl(212 62% 50%)", "hsl(26 66% 50%)", "hsl(136 42% 42%)"];
+
+// pre[j][b][n] = running sum over grid points 0..n, which is exactly what the
+// partial sum holds when it has fallen as far as row n.
+const pre = T.map((row, j) => BATCH.map(col => {
+  let s = 0; return row.map((w, n) => (s += w * col.v[n]));
+}));
+
+const cv = document.getElementById("c"), cx = cv.getContext("2d");
+let t = 0, playing = true, speed = 11, scale = 48;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const f2 = v => (Math.abs(v) < 5e-3 ? 0 : v).toFixed(2);
+
+function tx(s, x, y, a, col, size, bold) {
+  cx.fillStyle = col || css("--fg"); cx.textAlign = a || "left"; cx.textBaseline = "middle";
+  cx.font = `${bold ? "600 " : ""}${size || 12}px ui-sans-serif, system-ui, sans-serif`;
+  cx.fillText(s, x, y);
+}
+function rr(x, y, w, h, r) {
+  cx.beginPath(); cx.moveTo(x + r, y);
+  cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r);
+  cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath();
+}
+
+const CS = 50, AX = 258, AY = 118;            // cell size, array origin
+const PX = 40, OX = 720;
+
+function draw() {
+  cx.clearRect(0, 0, cv.width, cv.height);
+  const cyc = Math.floor(t), frac = t - cyc;
+
+  // ---------- packed input, 8 grid points by 3 signals ----------
+  tx("packed input", PX, 74, "left", css("--fg"), 13, true);
+  tx("8 rows, one per grid point", PX, 92, "left", css("--dim"), 11);
+  for (let b = 0; b < KB; b++) {
+    tx(BATCH[b].n, PX + 26 + b * 46, AY - 10, "center", HUE[b], 12, true);
+    for (let n = 0; n < N; n++) {
+      const entering = cyc - n === b;            // this value enters row n now
+      cx.fillStyle = entering ? HUE[b] : css("--cell");
+      rr(PX + 6 + b * 46, AY + n * CS + 7, 42, CS - 14, 4); cx.fill();
+      tx(f2(BATCH[b].v[n]), PX + 27 + b * 46, AY + n * CS + CS / 2,
+         "center", entering ? "#fff" : css("--dim"), 11.5, entering);
+    }
+  }
+  for (let n = 0; n < N; n++)
+    tx("n=" + n, PX - 8, AY + n * CS + CS / 2, "right", css("--dim"), 10.5);
+
+  // ---------- the array ----------
+  tx("matrix unit, 8 x 8 of it shown", AX, 74, "left", css("--fg"), 13, true);
+  tx("weights held still; partial sums fall", AX, 92, "left", css("--dim"), 11);
+  for (let j = 0; j < M; j++)
+    tx(OUTNAME[j], AX + j * CS + CS / 2, AY - 12, "center", css("--dim"), 10);
+  for (let j = M; j < EDGE; j++)
+    tx("idle", AX + j * CS + CS / 2, AY - 12, "center", css("--dim"), 10);
+
+  for (let n = 0; n < N; n++) for (let j = 0; j < EDGE; j++) {
+    const x = AX + j * CS, y = AY + n * CS;
+    const loaded = j < M;
+    cx.fillStyle = loaded ? css("--cell") : css("--idle");
+    cx.fillRect(x + 1, y + 1, CS - 2, CS - 2);
+    if (!loaded) continue;
+    tx(f2(T[j][n]), x + 4, y + 9, "left", css("--dim"), 9);     // stationary weight
+
+    // a partial sum is here if some batch column's wavefront is on this cell
+    for (const [c, alpha] of [[cyc, 1], [cyc - 1, 0.3 * (1 - frac)]]) {
+      const b = c - n - j;
+      if (b < 0 || b >= KB || alpha <= 0.02) continue;
+      cx.globalAlpha = alpha; cx.fillStyle = HUE[b];
+      cx.fillRect(x + 1, y + 1, CS - 2, CS - 2);
+      cx.globalAlpha = 1;
+      if (alpha === 1) {
+        tx(f2(pre[j][b][n]), x + CS / 2, y + CS / 2 + 3, "center", "#fff", 13, true);
+        tx(BATCH[b].n, x + CS - 5, y + 9, "right", "rgba(255,255,255,.85)", 9);
+      }
+    }
+  }
+  cx.strokeStyle = css("--line");
+  cx.strokeRect(AX, AY, EDGE * CS, N * CS);
+  // the falling direction
+  for (let j = 0; j < M; j++) {
+    const x = AX + j * CS + CS / 2, y = AY + N * CS;
+    cx.strokeStyle = css("--out"); cx.beginPath();
+    cx.moveTo(x, y + 4); cx.lineTo(x, y + 16); cx.stroke();
+    cx.beginPath(); cx.moveTo(x - 4, y + 12); cx.lineTo(x, y + 18);
+    cx.lineTo(x + 4, y + 12); cx.stroke();
+  }
+  tx("activations enter here", AX - 6, AY + N * CS + 34, "left", css("--dim"), 10.5);
+
+  // ---------- outputs ----------
+  tx("answers out", OX, 74, "left", css("--fg"), 13, true);
+  tx("one row per output mode", OX, 92, "left", css("--dim"), 11);
+  for (let b = 0; b < KB; b++)
+    tx(BATCH[b].n, OX + 56 + b * 56, AY - 10, "center", HUE[b], 12, true);
+  for (let j = 0; j < M; j++) {
+    tx(OUTNAME[j], OX - 6, AY + j * 52 + 26, "right", css("--dim"), 10.5);
+    for (let b = 0; b < KB; b++) {
+      const ready = cyc >= b + j + N;
+      cx.fillStyle = ready ? HUE[b] : css("--cell");
+      rr(OX + 30 + b * 56, AY + j * 52 + 8, 52, 36, 5); cx.fill();
+      tx(ready ? f2(pre[j][b][N - 1]) : "", OX + 56 + b * 56, AY + j * 52 + 27,
+         "center", "#fff", 13, true);
+    }
+  }
+
+  // ---------- how it looks at full size ----------
+  const sx = OX + 10, sy = 480, sp = 150;
+  tx(`the real array is 128 x 128`, sx, sy - 16, "left", css("--fg"), 13, true);
+  cx.fillStyle = css("--idle"); cx.fillRect(sx, sy, sp, sp);
+  const used = sp * scale / 128;
+  cx.fillStyle = css("--hold"); cx.fillRect(sx, sy, used, used);
+  cx.strokeStyle = css("--line"); cx.strokeRect(sx, sy, sp, sp);
+  tx(`${scale} x ${scale} weights loaded`, sx, sy + sp + 16, "left", css("--dim"), 11);
+  tx(`${(100 * scale * scale / 16384).toFixed(1)}% of the cells`, sx, sy + sp + 32,
+     "left", css("--dim"), 11);
+
+  // ---------- cycle strip ----------
+  const by = 560, bw = 560;
+  tx(`cycle ${Math.min(cyc, LAST)} of ${LAST}`, PX, by - 14, "left", css("--fg"), 13, true);
+  cx.fillStyle = css("--idle"); rr(PX, by, bw, 16, 4); cx.fill();
+  cx.fillStyle = css("--hold");
+  rr(PX, by, Math.max(3, bw * Math.min(1, t / LAST)), 16, 4); cx.fill();
+  for (let b = 0; b < KB; b++) {
+    const x0 = PX + bw * (b / LAST), x1 = PX + bw * ((b + M - 1 + N) / LAST);
+    cx.strokeStyle = HUE[b]; cx.lineWidth = 2.5;
+    cx.beginPath(); cx.moveTo(x0, by + 26 + b * 13); cx.lineTo(x1, by + 26 + b * 13);
+    cx.stroke(); cx.lineWidth = 1;
+    tx(`${BATCH[b].n}, ${BATCH[b].why}`, x1 + 8, by + 26 + b * 13, "left", HUE[b], 10.5);
+  }
+  tx("the three signals overlap in the array; that overlap is the only thing a bigger batch buys",
+     PX, by + 82, "left", css("--dim"), 11);
+}
+
+function tick() {
+  if (playing) { t += speed / 30; if (t > LAST + 3) t = 0; }
+  draw(); requestAnimationFrame(tick);
+}
+function legend() {
+  document.getElementById("legend").innerHTML =
+    `<b>What to watch.</b> A coloured cell holds a partial sum in flight, and the number in it ` +
+    `is the real running total: the sum of weight times activation for every grid point it has ` +
+    `fallen past. Each signal's wavefront is a diagonal stripe, so when all three are inside at ` +
+    `once you are seeing three transforms share the same resident weights.<br><br>` +
+    `Signal A is a constant and lands 8.00 at Re X[0] and 0 everywhere else. B is one cosine ` +
+    `and lands 4.00 at Re X[1], which is N/2. C is an impulse and lands 1.00 at every mode. ` +
+    `Both imaginary rows stay 0 because all three inputs are symmetric.<br><br>` +
+    `<b>Why the batch matters.</b> Loading the weights costs 8 cycles of fall before the first ` +
+    `answer appears, and that is paid once no matter how many signals follow. Three signals ` +
+    `take ${LAST} cycles, so about 3 of ${LAST} are useful. A thousand signals would take 1011, ` +
+    `and almost all of it useful. Four of the eight columns here are idle because this band ` +
+    `keeps 2 modes and stacking cos over sin only reaches 4 rows, which is the same waste the ` +
+    `128 x 128 panel shows at full size.`;
+}
+document.getElementById("play").onclick = e => { playing = !playing;
+  e.target.textContent = playing ? "Pause" : "Play"; e.target.classList.toggle("on", playing); };
+document.getElementById("step").onclick = () => { playing = false; t = Math.floor(t) + 1;
+  const p = document.getElementById("play"); p.textContent = "Play"; p.classList.remove("on"); };
+document.getElementById("back").onclick = () => { playing = false;
+  t = Math.max(0, Math.floor(t) - 1);
+  const p = document.getElementById("play"); p.textContent = "Play"; p.classList.remove("on"); };
+document.getElementById("reset").onclick = () => { t = 0; };
+document.getElementById("speed").oninput = e => { speed = +e.target.value; };
+document.getElementById("scale").onchange = e => { scale = +e.target.value; };
+document.getElementById("theme").onclick = () => {
+  const r = document.documentElement;
+  r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark";
+};
+legend(); tick();
+</script>
