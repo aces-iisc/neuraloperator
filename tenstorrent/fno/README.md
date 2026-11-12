@@ -169,6 +169,41 @@ pass is its own `MVMUL`, so precision is a throughput dial set per matmul. Measu
 `SrcA` never contributes its mantissa LSB even at four phases, so which operand goes where is an
 accuracy decision. The transform matrix and the field data are not interchangeable in that slot.
 
+## Two axes
+
+`host/fft/` mirrors `torch_fno/fft/` file for file, so the two ports read side by side. The 1-D
+engines moved there unchanged -- the sweep's 594 cells come back byte-identical -- and
+`rfft2d.cpp` is the new half.
+
+`rfft2_low_modes` keeps the lowest `row_modes x col_modes` bins of a real
+`(n_rows x n_cols x batch)` field, and nothing outside that band is ever computed. The rows are
+real, so cos and sin stack into **one** matmul. The columns are complex, so they take **three**
+(Gauss/Karatsuba, `p1 = ac`, `p2 = bd`, `p3 = (a+b)(c+d)`), which is what the torch port does and
+why `complex_matmul` exists at all: no 1-D variant needs it.
+
+Four matmuls in total. For a 64x64 field with half the modes kept, at one phase, that is 128
+MVMUL for the rows and 96 for the columns.
+
+The one place this port diverges from the GPU is how the column pass is **grouped**. The torch
+version contracts the middle axis with an einsum, `dw,awt->adt`, so it never transposes -- on a
+GPU a transpose is real data movement. There is no einsum here: the device performs `Y = T @ X`
+and nothing else, so the contracted axis has to lead. Folding that axis swap into `pack_tiles`,
+which reorders every operand into block-major on the way to L1 anyway, costs nothing and makes
+the batch `row_modes` times longer, so the padding is paid once instead of per row mode. The
+alternative -- one matmul per row mode, keeping the torch axis order -- issues **1536** MVMUL
+where this issues **96** for the same arithmetic.
+
+What is *not* ported is `rfft2_full`, because its row pass is the staged radix rfft. Staging needs
+a twiddle multiply between butterfly stages; that is elementwise, the matrix unit has no cheap
+elementwise lane, and every stage boundary would cross back to the host. Nothing here stages.
+
+`check_rfft2` runs twelve shapes against the exact partial DFT in float64. All twelve match
+`rfft2_mvmuls` exactly, which is the structural check. The accuracy is reported rather than
+asserted: with `FNO_STAGES=1` it also runs the row pass alone, and the 2-D error comes out at
+**2.0-2.6x** the row-pass error in every case -- two sequential roundings, the second amplified
+a little by Karatsuba's `c - a - b` cancellation. The ratio holds across band width, batch and
+aspect, which is what distinguishes it from a loop-bound mistake.
+
 ## Layout
 
 | path | what |
@@ -178,14 +213,19 @@ accuracy decision. The transform matrix and the field data are not interchangeab
 | `fw/entry.S`, `fw/kernel.ld` | BRISC starts at L1 address zero, so the image is linked flat |
 | `host/device.{h,cpp}` | the simulator as a PCIe device: BAR windows, L1, tile boot. Carries over to silicon unchanged |
 | `host/numerics.{h,cpp}` | operand formats, tile layouts, the float64 reference |
-| `host/tile_matmul.{h,cpp}` | the one device operation the engines are built from |
-| `host/engines.{h,cpp}` | reim, coupled and reduced |
+| `host/tile_matmul.{h,cpp}` | the one device operation every transform is built from |
+| `host/fft/core.{h,cpp}` | row sets, restricted DFT matrices, the Karatsuba product, the float64 references |
+| `host/fft/rfft1d.{h,cpp}` | the real 1-D transform: `rfft_rows`, `rfft_low_modes`, `rfft_direct` |
+| `host/fft/tricks.{h,cpp}` | the coupled and reduced packings |
+| `host/fft/rfft2d.{h,cpp}` | the 2-D transform, band-limited on both axes |
+| `host/fft/transform.{h,cpp}` | picking a 1-D engine by name, for the sweeps |
 | `host/check_mvmul.cpp` | the matrix unit against a host reference, shape by shape |
 | `host/probe_dst.cpp` | Dst through the debug array port, for when the packer is the suspect |
 | `host/sweep.cpp` | the ladder, to CSV |
 | `fw/pipeline.cpp` | the same matmul split across three Tensix threads, one source per stage |
 | `host/pipeline_matmul.{h,cpp}` | the three-stage form of one matmul, driven by an epoch counter |
 | `host/check_pipeline.cpp` | three stages against one core, bit for bit |
+| `host/check_rfft2.cpp` | the 2-D transform against the exact partial DFT in float64 |
 | `tools/cfgreg.py` | which config register a named field lives in, read from the simulator's own description |
 
 ## Building and running
@@ -196,6 +236,7 @@ The firmware needs Tenstorrent's RISC-V toolchain; set `SFPI` if it is not in `.
 ./build.sh
 _out/check_mvmul     ../ttsim/src/_out/release_bh/libttsim.so  # the matrix unit, verified
 _out/check_pipeline  ../ttsim/src/_out/release_bh/libttsim.so  # three stages vs one core
+_out/check_rfft2     ../ttsim/src/_out/release_bh/libttsim.so  # the 2-D transform, verified
 _out/sweep           ../ttsim/src/_out/release_bh/libttsim.so  # the engines, to results/
 _out/scale           ../ttsim/src/_out/release_bh/libttsim.so  # across the Tensix, to results/
 ```

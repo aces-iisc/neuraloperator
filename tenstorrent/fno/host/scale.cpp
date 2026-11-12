@@ -11,7 +11,6 @@
 // idle; and a share that is not a whole number of column tiles rounds up, so the padded work
 // grows as the pieces get smaller.
 #include "device.h"
-#include "engines.h"
 #include "multicore.h"
 #include "numerics.h"
 #include "roofline.h"

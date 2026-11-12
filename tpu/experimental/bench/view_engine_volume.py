@@ -19,7 +19,7 @@ Encoding, in each file:
   colour and shape   which of the three engines was fastest in that cell
   marker size        how far it beat the runner-up, so a win by a percent is not drawn like a
                      win by a factor of four
-  opacity            whether it also beat the library transform; a transparent marker means the
+  hollow marker      whether it also beat the library transform; an outlined marker means the
                      library computed the whole spectrum and still came first.  The `nolib`
                      files drop this question and draw every marker solid.
   grey marker        a cell that could not be measured, with the reason in the hover text:
@@ -135,6 +135,11 @@ def traces(cells, why, show_lib):
         for picked, symbol, name, alpha in groups:
             if not picked:
                 continue
+            # An open symbol is drawn as its outline and nothing else, and the page is white,
+            # so a white outline erases the marker.  The hollow ones take the engine's own
+            # colour; the filled ones keep a hairline of white, which only separates
+            # neighbouring markers from each other.
+            hollow = "open" in symbol
             out.append({
                 "type": "scatter3d", "mode": "markers", "name": name,
                 "x": [p["x"][i] for i in picked], "y": [p["y"][i] for i in picked],
@@ -142,8 +147,8 @@ def traces(cells, why, show_lib):
                 "text": [p["t"][i] for i in picked], "hoverinfo": "text",
                 "marker": {"size": [p["s"][i] for i in picked], "color": COLOUR[engine],
                            "symbol": symbol, "opacity": alpha,
-                           "line": {"width": 2.0 if "open" in symbol else 0.5,
-                                    "color": "#ffffff"}},
+                           "line": {"width": 2.0 if hollow else 0.5,
+                                    "color": COLOUR[engine] if hollow else "#ffffff"}},
             })
     if holes["x"]:
         out.append({
@@ -242,7 +247,8 @@ PAGE = r"""<!doctype html>
     <dt>Size</dt><dd>how far it beat the runner-up &mdash; smallest is a tie, largest is
     four times or more.</dd>
     <dt>Hollow marker</dt><dd>the library transform beat all three, so computing only the band
-    was not worth it there. The shape still names which of ours came first.</dd>
+    was not worth it there. The outline keeps the colour and shape, so it still names which of
+    ours came first.</dd>
     <dt>Small grey cross</dt><dd>a cell with no winner. Hover says why: the field set did not fit
     in memory, or an engine does not accept that batch.</dd>
   </dl>

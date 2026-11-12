@@ -16,7 +16,7 @@
 // Fidelity phases are the one axis neither earlier device had.
 
 #include "device.h"
-#include "engines.h"
+#include "fft/transform.h"
 #include "roofline.h"
 #include "numerics.h"
 #include "../include/tensix.h"
@@ -28,6 +28,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+using namespace fft;
 
 namespace {
 

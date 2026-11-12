@@ -53,24 +53,35 @@ done
 
 # -- host ------------------------------------------------------------------------------------
 HOSTFLAGS="-O2 -g -std=c++20 -Wall -Wextra -I$OUT"
-g++ $HOSTFLAGS -o "$OUT/check_mvmul" "$ROOT/host/check_mvmul.cpp" "$ROOT/host/device.cpp" \
-    "$ROOT/host/numerics.cpp" "$ROOT/host/tile_matmul.cpp" -ldl
-g++ $HOSTFLAGS -o "$OUT/probe_dst" "$ROOT/host/probe_dst.cpp" "$ROOT/host/device.cpp" \
-    "$ROOT/host/numerics.cpp" "$ROOT/host/tile_matmul.cpp" -ldl
+
+# The hardware layer: the one matmul the device performs, and what it takes to get operands
+# there.  Nothing in it knows what a transform is.
+DEVICE="$ROOT/host/device.cpp $ROOT/host/numerics.cpp $ROOT/host/tile_matmul.cpp"
+
+# The transform layer, laid out to mirror torch_fno/fft: shared helpers, then one file per
+# variant.  core.cpp holds the row sets, the restricted DFT matrices, the Karatsuba complex
+# product and the float64 references.
+FFT="$ROOT/host/fft/core.cpp $ROOT/host/fft/rfft1d.cpp $ROOT/host/fft/tricks.cpp \
+     $ROOT/host/fft/rfft2d.cpp $ROOT/host/fft/transform.cpp"
+
+g++ $HOSTFLAGS -o "$OUT/check_mvmul" "$ROOT/host/check_mvmul.cpp" $DEVICE -ldl
+g++ $HOSTFLAGS -o "$OUT/probe_dst" "$ROOT/host/probe_dst.cpp" $DEVICE -ldl
+
 if [ -f "$ROOT/host/scale.cpp" ]; then
-    g++ $HOSTFLAGS -o "$OUT/scale" "$ROOT/host/scale.cpp" "$ROOT/host/device.cpp" \
-        "$ROOT/host/numerics.cpp" "$ROOT/host/tile_matmul.cpp" "$ROOT/host/multicore.cpp" \
-        "$ROOT/host/engines.cpp" -ldl
+    g++ $HOSTFLAGS -o "$OUT/scale" "$ROOT/host/scale.cpp" $DEVICE \
+        "$ROOT/host/multicore.cpp" -ldl
 fi
 
 if [ -f "$ROOT/host/check_pipeline.cpp" ]; then
-    g++ $HOSTFLAGS -o "$OUT/check_pipeline" "$ROOT/host/check_pipeline.cpp" \
-        "$ROOT/host/device.cpp" "$ROOT/host/numerics.cpp" "$ROOT/host/tile_matmul.cpp" \
+    g++ $HOSTFLAGS -o "$OUT/check_pipeline" "$ROOT/host/check_pipeline.cpp" $DEVICE \
         "$ROOT/host/pipeline_matmul.cpp" -ldl
 fi
 
+if [ -f "$ROOT/host/check_rfft2.cpp" ]; then
+    g++ $HOSTFLAGS -o "$OUT/check_rfft2" "$ROOT/host/check_rfft2.cpp" $DEVICE $FFT -ldl
+fi
+
 if [ -f "$ROOT/host/sweep.cpp" ]; then
-    g++ $HOSTFLAGS -o "$OUT/sweep" "$ROOT/host/sweep.cpp" "$ROOT/host/device.cpp" \
-        "$ROOT/host/numerics.cpp" "$ROOT/host/tile_matmul.cpp" "$ROOT/host/engines.cpp" -ldl
+    g++ $HOSTFLAGS -o "$OUT/sweep" "$ROOT/host/sweep.cpp" $DEVICE $FFT -ldl
 fi
 echo "built into $OUT"
